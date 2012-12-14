@@ -140,5 +140,7 @@ void copy_page_pa(u32 target,u32 source);
 void copy_page_ua(u32 taget,u32 source);
 struct page *pa_to_page(unsigned long pa);
 unsigned long va_to_pa(unsigned long va);
+unsigned long page_to_va(struct page *page);
+void *get_free_page_aligin(unsigned long aligin,u32 flag);
 
 #endif

@@ -878,7 +878,8 @@ void *get_free_page_aligin(unsigned long aligin,u32 flag)
 	mutex_lock(&zone->zone_mutex);
 	for(i = 0; i < zone->nr_section; i++){
 		section = &zone->memory_section[i];
-		for(j = section->vir_start; j < section->size; j += SIZE_1M){
+		for(j = section->vir_start; j < (section->vir_start) + (section->size); j += SIZE_1M){
+			
 			id = va_to_page_id(j); 
 			j += offset;
 			if(!page_state(j)){

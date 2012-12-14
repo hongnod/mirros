@@ -14,6 +14,7 @@ extern int schec_init(void);
 extern int console_early_init(void);
 extern int console_late_init(void);
 extern int arch_irq_init(void);
+extern int trap_init(void);
 
 int main(void)
 {
@@ -32,8 +33,8 @@ int main(void)
 	 *a more stronger printk system if needed.
 	 */
 	console_late_init();
-
 	slab_init();
+	trap_init();
 	arch_irq_init();
 #if 0
 	sched_init();
@@ -52,4 +53,3 @@ int main(void)
 
 	return 0;
 }
-

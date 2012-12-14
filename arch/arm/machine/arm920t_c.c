@@ -82,6 +82,17 @@ u32 arch_get_page_table_attr(u32 flag)
 	return PGT_DES_DEFAULT;
 }
 
+static void arch_remap_vector(void)
+{
+	asm(
+		"push {r0}\n\t"
+		"mrc p15, 0, r0, c1, c0, 0\n\t"
+		"orr r0, #1<<13\n\t"
+		"mcr p15, 0, r0, c1, c0, 0\n\t"
+		"pop {r0}\n\t"
+	);
+}
+
 static void invalidate_id_cache(void)
 {
 	asm(
@@ -203,6 +214,41 @@ int arch_irq_init(void)
 	memset(irq_table_base,0,nr<<PAGE_SHIFT);
 
 	platform_irq_init();
+
+	return 0;
+}
+
+int trap_init(void)
+{
+	extern char _vector_start[];
+	extern char _vector_end[];
+	void *vector_page;
+
+	/*
+	 * first we get a page load the vector code,notice:
+	 * since the vector must remaped at 0xffff0000, we also 
+	 * need map 0xfff00000 to the page section address which
+	 * we get.
+	 */
+	vector_page = get_free_page_aligin(0xffff0000,GFP_KERNEL);
+	kernel_debug("vector address is 0x%x\n",(u32)vector_page);
+	if(vector_page == NULL){
+		kernel_error("faild get page for trap\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * copy the vector code to the page we get. then map 0xfff00000
+	 * to va_to_pa(vector_page) & 0xfff00000. at the last chage the
+	 * value of bit13 of cp register c1 to indicate that we need remap
+	 * the vector.
+	 */
+	memcpy(vector_page,(void *)_vector_start,_vector_end - _vector_start);
+	kernel_debug("physic address of vector is 0x%x\n",(u32)va_to_pa(vector_page));
+	build_tlb_table_entry(0xfff00000,va_to_pa((unsigned long)vector_page)&0xfff00000,
+			SIZE_1M,TLB_ATTR_KERNEL_MEMORY);	
+
+	arch_remap_vector();
 
 	return 0;
 }
