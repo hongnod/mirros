@@ -11,6 +11,8 @@
 #include <os/errno.h>
 #include <os/string.h>
 #include <os/io.h>
+#include <asm/asm_sched.h>
+#include <os/sched.h>
 
 /*
  *code for libgcc.a
@@ -151,6 +153,7 @@ void irq_handler(void)
 {
 	int nr;
 
+	printk("irq_handler\n");
 	/*
 	 *first get irq number, then clean irq pending
 	 */
@@ -172,7 +175,7 @@ struct irq_des *arch_get_irq_description(int nr)
 
 	ret = base + nr;
 	if(ret->fn == NULL){
-		kernel_error("handler of irq %d has not been register\n");
+		kernel_debug("description of irq %d has not been register\n",nr);
 		return NULL;
 	}
 
@@ -244,11 +247,91 @@ int trap_init(void)
 	 * the vector.
 	 */
 	memcpy(vector_page,(void *)_vector_start,_vector_end - _vector_start);
-	kernel_debug("physic address of vector is 0x%x\n",(u32)va_to_pa(vector_page));
+	kernel_debug("physic address of vector is 0x%x\n",
+			(u32)va_to_pa((unsigned long)vector_page));
 	build_tlb_table_entry(0xfff00000,va_to_pa((unsigned long)vector_page)&0xfff00000,
 			SIZE_1M,TLB_ATTR_KERNEL_MEMORY);	
 
 	arch_remap_vector();
 
 	return 0;
+}
+
+void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
+{
+	regs->r0 = (u32)arg;
+	regs->r1 = 1;
+	regs->r2 = 2;
+	regs->r3 = 3;
+	regs->r4 = 4;
+	regs->r5 = 5;
+	regs->r6 = 6;
+	regs->r7 = 7;
+	regs->r8 = 8;
+	regs->r9 = 9;
+	regs->r10 = 10;
+	regs->r11 = 11;
+	regs->r12 = 12;
+	regs->sp = 0;
+	regs->lr = (u32)fn;
+	regs->pc = 0;
+	regs->cpsr = SVC_MODE;
+}
+
+int arch_set_up_process(pt_regs *regs,struct task_struct *task)
+{
+	u32 *stack_base;
+
+	/*
+	 * in arm, stack is grow from up to down,so we 
+	 * adjust it;
+	 */
+	if(task->stack_base == NULL){
+		kernel_error("task kernel stack invailed\n");
+		return -EFATAL;
+	}
+	task->stack_base += KERNEL_STACK_SIZE;
+	stack_base = task->stack_base;
+	
+	*(--stack_base) = regs->lr;
+	/*
+	 * note:this sp is in user space,if the process is a 
+	 * kernel task, this value will no effect.
+	 */
+	*(--stack_base) = regs->sp;	
+	*(--stack_base) = regs->r12;
+	*(--stack_base) = regs->r11;
+	*(--stack_base) = regs->r10;
+	*(--stack_base) = regs->r9;
+	*(--stack_base) = regs->r8;
+	*(--stack_base) = regs->r7;
+	*(--stack_base) = regs->r6;
+	*(--stack_base) = regs->r5;
+	*(--stack_base) = regs->r4;
+	*(--stack_base) = regs->r3;
+	*(--stack_base) = regs->r2;
+	*(--stack_base) = regs->r1;
+	/*
+	 * for kernel task,r0 is the argument (void *)arg;
+	 * but for user space r0 need to be set to 0;
+	 */
+	*(--stack_base) = regs->r0;
+	*(--stack_base) = regs->cpsr;
+
+	task->stack_base = (void *)stack_base;
+
+	return 0;
+}
+
+int arch_set_task_return_value(pt_regs *reg,
+		struct task_struct *task)
+{
+	reg->r0 = 0;
+
+	return 0;
+}
+
+void data_abort_handler(void)
+{
+	panic("data abort\n");
 }

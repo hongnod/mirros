@@ -1,5 +1,5 @@
 obj-c  = bitops.o mutex.o string.o interrupt.o mmu.o  \
-	 printk.o sched.o task.o elf.o io.o
+	 printk.o sched.o task.o elf.o io.o panic.o
 
 out-dir := $(OUT_KERNEL)
 

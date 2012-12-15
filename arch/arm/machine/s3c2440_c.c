@@ -97,7 +97,7 @@ irq_t platform_timer_tick_handler(void *arg)
 	return 0;
 }
 
-int timer_tick_init(int ms)
+int timer_tick_init(void)
 {
 	timer_base = request_io_mem(TIMER_BASE);
 	if(timer_base == NULL){

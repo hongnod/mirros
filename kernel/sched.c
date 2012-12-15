@@ -36,8 +36,8 @@ static struct sched_list os_sched_table[MAX_PRIO];
  *and task will be schedule at now
  */
 struct task_struct *current;
-struct task_struct *kernel;
-static struct task_struct *next_run;
+struct task_struct *idle;
+struct task_struct *next_run;
 struct mutex sched_mutex;
 
 static int schedule_running = 0;
@@ -53,15 +53,15 @@ int in_interrupt = 0;
 	}while(0)
 
 
-#define sched_list_add_task(name,task)		\
+#define sched_list_add_task(name,sched)		\
 	do{					\
-		list_add(&task_##name.list,&task->name);  \
+		list_add(&task_##name.list,&sched->name);  \
 		task_##name.count++;		\
 	}while(0)
 
-#define sched_list_del_task(name,task)	\
+#define sched_list_del_task(name,sched)	\
 	do{						\
-		list_del(&task->name);	\
+		list_del(&sched->name);	\
 		task_##name.count--;		\
 	}while(0)
 
@@ -76,22 +76,22 @@ DECLARE_SCHED_LIST(system);
 DECLARE_SCHED_LIST(idle);
 DECLARE_SCHED_LIST(sleep);
 
-static void inline prio_list_add_task(struct task_struct *task)
+static void inline prio_list_add_task(struct sched_struct *sched)
 {
-	list_add(&os_sched_table[task->prio].list,&task->prio_running);
-	os_sched_table[task->prio].count++;
+	list_add(&os_sched_table[sched->prio].list,&sched->prio_running);
+	os_sched_table[sched->prio].count++;
 }
 
-static void inline prio_list_add_task_tail(struct task_struct *task)
+static void prio_list_add_task_tail(struct sched_struct *sched)
 {
-	list_add_tail(&os_sched_table[task->prio].list,&task->prio_running);
-	os_sched_table[task->prio].count++;
+	list_add_tail(&os_sched_table[sched->prio].list,&sched->prio_running);
+	os_sched_table[sched->prio].count++;
 }
 
-static void inline prio_list_del_task(struct task_struct *task)
+static void inline prio_list_del_task(struct sched_struct *sched)
 {
-	list_del(&task->prio_running);
-	os_sched_table[task->prio].count--;
+	list_del(&sched->prio_running);
+	os_sched_table[sched->prio].count--;
 }
 
 void inline set_task_state(struct task_struct *task,state_t state)
@@ -128,6 +128,36 @@ static int init_pid_allocater(void)
 	memset((char *)pid_map.addr,0,PID_MAP_PAGE_NR*PAGE_SIZE);
 
 	return 0;	
+}
+
+int init_sched_struct(struct task_struct *task)
+{
+	struct sched_struct *sched = &task->sched;
+
+	if(task->parent){
+		sched->prio = task->parent->sched.prio;
+		sched->pre_prio = task->parent->sched.pre_prio;
+	}
+	else{
+		/*
+		 * idle process
+		 */
+		sched->prio = MAX_PRIO - 1;
+		sched->pre_prio = sched->prio;
+	}
+
+	sched->run_time = 0;
+	sched->wait_time = 0;
+	sched->time_out = 0;
+	sched->run_count = 0;
+	
+	init_list(&sched->prio_running);
+	init_list(&sched->system);
+	init_list(&sched->sleep);
+	init_list(&sched->idle);
+	init_list(&sched->wait);
+
+	return 0;
 }
 
 pid_t get_new_pid(struct task_struct *task)
@@ -169,6 +199,8 @@ static int get_waitting_slice(int prio)
 
 int add_new_task(struct task_struct *task)
 {
+	struct sched_struct *sched = &task->sched;
+	
 	if(!task)
 		return 1;
 
@@ -178,9 +210,9 @@ int add_new_task(struct task_struct *task)
 	 */
 	mutex_lock(&sched_mutex);
 
-	sched_list_add_task(system,task);
+	sched_list_add_task(system,sched);
 	set_task_state(task,TASK_STATE_PREPARE);
-	prio_list_add_task_tail(task);
+	prio_list_add_task_tail(sched);
 
 	mutex_unlock(&sched_mutex);
 
@@ -191,6 +223,7 @@ static void find_next_run_task(void)
 {
 	int i;
 	struct list_head *task_head;
+	struct sched_struct *sched;
 
 	for(i=0;i<MAX_PRIO;i++){
 		if(os_sched_table[i].count)
@@ -198,11 +231,13 @@ static void find_next_run_task(void)
 	}
 
 	task_head = &os_sched_table[i].list;
-	next_run = list_first_entry(task_head,struct task_struct,prio_running);
+	sched = list_first_entry(task_head,struct sched_struct,prio_running);
+	next_run = container_of(sched,struct task_struct,sched);
 }
 
 static void prepare_to_switch(void)
 {
+	/*
 	current->wait_time = get_waitting_slice(current->prio);	//
 	current->run_time = 0;
 	sched_list_add_task(sleep,current);			//sleep for a second,then other task have time to run.
@@ -213,7 +248,7 @@ static void prepare_to_switch(void)
 	next_run->wait_time = 0;
 	prio_list_del_task(next_run);
 	set_task_state(next_run,TASK_STATE_RUNNING);
-
+*/
 }
 
 static void inline switch_task_sw(void)
@@ -253,7 +288,8 @@ re_run:
 int os_tick_handler(void *arg)
 {
 	struct list_head *list;
-	struct task_struct *task;
+	struct sched_struct *sched;
+	struct sched_struct *sched_current = &current->sched;
 
 	/*
 	 * look up for each task in sleep list,if task is waitting
@@ -261,13 +297,13 @@ int os_tick_handler(void *arg)
 	 * means that the task needed other action to resume him
 	 */
 	sched_list_for_each(sleep,list){
-		task = list_entry(list,struct task_struct,sleep);
-		if(task->wait_time)
-			task->wait_time--;
+		sched = list_entry(list,struct sched_struct,sleep);
+		if(sched->wait_time)
+			sched->wait_time--;
 
-		if(task->wait_time == 0){
-			sched_list_del_task(sleep,task);
-			prio_list_add_task(task);
+		if(sched->wait_time == 0){
+			sched_list_del_task(sleep,sched);
+			prio_list_add_task(sched);
 		}
 	}
 	
@@ -277,8 +313,8 @@ int os_tick_handler(void *arg)
 	 * are in irq mode,so we need to use a different way to switch 
 	 * task
 	 */
-	current->run_time--;
-	if(current->run_time == 0){
+	sched_current->run_time--;
+	if(sched_current->run_time == 0){
 		find_next_run_task();
 		if(next_run == current)
 			goto exit;
@@ -286,7 +322,7 @@ int os_tick_handler(void *arg)
 	}
 
 exit:
-	current->run_time = get_running_slice(current->prio);
+	sched_current->run_time = get_running_slice(sched_current->prio);
 
 	return 0;
 }

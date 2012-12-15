@@ -18,7 +18,6 @@
 /*
  *kernel stack size is 4k
  */
-#define KERNEL_STACK_SIZE		(4*1024)
 #define COMMAND_LINE_SIZE		\
 	(KERNEL_LOAD_ADDRESS_ALIGIN-PAGE_TABLE_SIZE-KERNEL_STACK_SIZE)
 

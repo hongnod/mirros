@@ -5,6 +5,9 @@
 #include <os/types.h>
 #include <os/mutex.h>
 #include <asm/asm_sched.h>
+#include <asm/config.h>
+
+#define KERNEL_STACK_SIZE	ARCH_KERNEL_STACK_SIZE
 
 #define MAX_PRIO		64
 #define MAX_PID			0XFFFF
@@ -40,6 +43,26 @@ struct mm_struct{
 	struct list_head elf_list;
 };
 
+struct sched_struct{
+	int run_time;
+	int wait_time;
+	int time_out;
+	u32 run_count;
+
+	int prio;
+	int pre_prio;
+
+	struct list_head prio_running;
+	struct list_head system;
+	struct list_head sleep;
+	//struct list_head prepare;
+	struct list_head idle;
+
+	/*for mutex*/
+	struct list_head wait;
+
+};
+
 /*
  * task_struct:represent a process in the kernel
  * stack_base:the base address of stack of one task
@@ -56,11 +79,10 @@ struct mm_struct{
  * wait:used for mutex,if a task is waitting a mutex,this list_head will insert to the mutex's waitting list
  */
 struct task_struct{
+	void *stack_base;		/*kernel stack of task*/
 	pt_regs regs;
 	char name[16];
 
-	void *stack_base;		/*kernel stack of userspace process*/
-	
 	u32 pid;
 	u32 uid;
 	
@@ -74,29 +96,13 @@ struct task_struct{
 
 	struct elf_file *bin;
 
-//	struct timespec start_time;
-//	struct timespec end_time;
-
 	u32 flag;
-	int run_time;
-	int wait_time;
-	int time_out;
-	u32 run_count;
-
-	int prio;
-	int pre_prio;
 
 	struct task_struct *parent;
 	struct list_head child;
+	struct list_head p;
 
-	struct list_head prio_running;
-	struct list_head system;
-	struct list_head sleep;
-	//struct list_head prepare;
-	struct list_head idle;
-
-	/*for mutex*/
-	struct list_head wait;
+	struct sched_struct sched;
 
 	struct mutex mutex;
 
@@ -104,12 +110,14 @@ struct task_struct{
 };
 
 extern struct task_struct *current;
-extern struct task_struct *kernel;
+extern struct task_struct *idle;
+extern struct task_struct *next_run;
 
 void set_task_state(struct task_struct *task,state_t state);
 state_t get_task_state(struct task_struct *task);
 int add_new_task(struct task_struct *task);
 void sched(void);
 pid_t get_new_pid(struct task_struct *task);
+int init_sched_struct(struct task_struct *task);
 
 #endif

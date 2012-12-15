@@ -3,6 +3,8 @@
 
 #include <os/types.h>
 
+struct task_struct;
+
 typedef struct _pt_regs{
 	u32 r0;
 	u32 r1;
@@ -26,5 +28,11 @@ typedef struct _pt_regs{
 
 void arch_switch_task_sw(void);
 void arch_switch_task_hw(void);
+void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg);
+int arch_set_up_process(pt_regs *regs,struct task_struct *task);
+
+
+int arch_set_task_return_value(pt_regs *reg,
+		struct task_struct *task);
 
 #endif

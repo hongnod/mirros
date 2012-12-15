@@ -8,5 +8,6 @@
 #define ETYPE		5
 #define EIO		6
 #define EINVAL		7
+#define EFATAL		8
 
 #endif

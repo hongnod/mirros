@@ -8,37 +8,66 @@
 #include <os/errno.h>
 #include <os/printk.h>
 #include <os/mmu.h>
+#include <asm/asm_sched.h>
+
+static int init_mm_struct(struct task_struct *task)
+{
+	struct mm_struct *mm = &task->mm_struct;
+	
+	/*
+	 * init mm_struct
+	 */
+	mm->elf_size = 0;
+	mm->stack_size = 0;
+	mm->stack_curr = NULL;
+	mm->elf_curr = NULL;
+	init_list(&mm->stack_list);
+	init_list(&mm->elf_list);
+	
+	return 0;
+}
 
 static pid_t init_task_struct(struct task_struct *task,u32 flag)
 {
 	struct task_struct *parent;
 
 	if(flag & PROCESS_TYPE_KERNEL){
-		parent = kernel;
+		parent = idle;
 	}
 	else{
 		parent = current;
 	}
 
-	task->pid = get_new_pid(task);
+	/*
+	 * get a new pid
+	 */
+	task->pid = get_new_pid(task);{
+		if(task->pid == 0){
+			return -EINVAL;
+		}
+	}
 	task->uid = parent->uid;
 	task->stack_base = NULL;
-	//strncpy(task->name,name,15);
 	task->bin = NULL;
-	task->prio = parent->prio;
-	task->pre_prio = parent->pre_prio;
-	task->stack_base = NULL;
+	strncpy(task->name,parent->name,15);
 	task->flag = flag;
 
-	task->mm_struct.elf_size = 0;
-	task->mm_struct.stack_size = 0;
-	task->mm_struct.stack_curr = NULL;
-	task->mm_struct.elf_curr = NULL;
-	init_list(&task->mm_struct.stack_list);
-	init_list(&task->mm_struct.elf_list);
-
+	/*
+	 *add task to the child list of his parent.
+	 */
+	task->parent = parent;
+	init_list(&task->p);
+	init_list(&task->child);
+	list_add(&parent->child,&task->p);
+	
+	/*
+	 * before init mm_struct and sched_struct.
+	 * the parent process must be ensure.
+	 */
+	init_mm_struct(task);
+	init_sched_struct(task);
+	
 	return task->pid;
-
 }
 
 static inline void _release_task_page_table(struct list_head *head)
@@ -106,12 +135,13 @@ static int inline release_task_pages(struct task_struct *task)
 	return 0;
 }
 
-#define KERNEL_STACK_SIZE	4096
 static int inline release_kernel_stack(struct task_struct *task)
 {
 	if(task->stack_base){
 		free_pages(task->stack_base);
 	}
+
+	task->stack_base = NULL;
 
 	return 0;
 }
@@ -126,9 +156,10 @@ static int release_task_memory(struct task_struct *task)
 	return 0;
 }
 
-static int alloc_page_table(struct task_struct *old,struct task_struct *new)
+static int alloc_page_table(struct task_struct *new)
 {
 	struct mm_struct *tmp = &new->mm_struct;
+	struct task_struct *old = new->parent;
 	int i;
 	void *addr;
 	struct page *page;
@@ -275,28 +306,31 @@ static int alloc_memory_for_task(struct task_struct *task)
 
 	int ret = 0;
 
-	if(task->flag & PROCESS_TYPE_KERNEL){
-		ret = alloc_kernel_stack(task);
+	ret = alloc_kernel_stack(task);
+	if(ret){
+		kernel_error("allocate kernel stack failed\n");
+		return ret;
+	}
+
+	if(task->flag & PROCESS_TYPE_USER){
+		ret = alloc_page_table(task);
 		if(ret){
-			kernel_error("allocate kernel stack failed\n");
+			kernel_error("allcate page_table failed\n");
+			goto error;
 		}
 
-		return ret;
+		ret = alloc_memory_and_map(task);
+		if(ret){
+			kernel_error("no enough memory for task\n");
+		}
 	}
 
-	ret = alloc_page_table(current,task);
-	if(ret){
-		kernel_error("allcate page_table failed\n");
-		return ret;
-	}
+	return ret;
 
-	ret = alloc_memory_and_map(task);
-	if(ret){
-		kernel_error("no enough memory for task\n");
-		return ret;
-	}
+error:
+	release_kernel_stack(task);
 
-	return 0;
+	return -ENOMEM;
 }
 
 static int copy_process_memory(struct task_struct *old,struct task_struct *new)
@@ -357,28 +391,28 @@ static int copy_process_memory(struct task_struct *old,struct task_struct *new)
 	return 0;
 }
 
-static int copy_process(struct task_struct *old,struct task_struct *new)
+static int copy_process(struct task_struct *new)
 {
+	struct task_struct *old = new->parent;
+
 	copy_process_memory(old,new);
 
 	return 0;
 }
 
-static void set_up_process(pt_regs regs,struct task_struct *task)
+static int inline set_up_process(pt_regs *regs,
+		struct task_struct *task)
 {
-	if(task->flag & PROCESS_TYPE_KERNEL)
-		regs.sp = (u32)task->stack_base;
-
-	task->regs = regs;
-	if(task->flag &PROCESS_TYPE_USER){
-		/*
-		 *if task is user fork task,r0 need tob set as the return value.
-		 */
-		task->regs.r0 = 0;
-	}
+	return arch_set_up_process(regs,task);
 }
 
-pid_t do_fork(pt_regs regs,u32 sp,u32 flag)
+static int inline set_task_return_value(pt_regs *reg,
+		struct task_struct *task)
+{
+	return arch_set_task_return_value(reg,task);
+}
+
+static pid_t do_fork(pt_regs regs,u32 sp,u32 flag)
 {
 	pid_t pid;
 	struct task_struct *new;
@@ -396,6 +430,9 @@ pid_t do_fork(pt_regs regs,u32 sp,u32 flag)
 		goto exit;
 	}
 	
+	/*
+	 * allocate page table and memory for task
+	 */
 	ret = alloc_memory_for_task(new);
 	if(ret){
 		kernel_error("allocate memory for task failed\n");
@@ -405,10 +442,11 @@ pid_t do_fork(pt_regs regs,u32 sp,u32 flag)
 	if(flag & PROCESS_TYPE_KERNEL)
 		goto setup_and_add_task;
 
-	copy_process(current,new);
+	copy_process(new);
+	set_task_return_value(&regs,new);
 
 setup_and_add_task:
-	set_up_process(regs,new);
+	set_up_process(&regs,new);
 	add_new_task(new);
 
 	return pid;
@@ -430,38 +468,61 @@ pid_t sys_fork(pt_regs regs,u32 sp)
 
 static void inline init_pt_regs(pt_regs *regs,int (*fn)(void *arg),void *arg)
 {
-	regs->r0 = (u32)arg;
-	regs->r1 = 1;
-	regs->r2 = 2;
-	regs->r3 = 3;
-	regs->r4 = 4;
-	regs->r5 = 5;
-	regs->r6 = 6;
-	regs->r7 = 7;
-	regs->r8 = 8;
-	regs->r9 = 9;
-	regs->r10 = 10;
-	regs->r11 = 11;
-	regs->r12 = 12;
-	regs->sp = 0;
-	regs->lr = (u32)fn;
-	regs->pc = 0;
-	regs->cpsr = 0;
+	/*
+	 * set up the stack of the task before his
+	 * first running
+	 */
+	arch_init_pt_regs(regs,fn,arg);
 }
 
 int kthread_run(int (*fn)(void *arg),void *arg)
 {
 	u32 flag = 0;
 	pt_regs regs;
-	pid_t pid = 0;
 
 	flag |= PROCESS_TYPE_KERNEL;	
 	init_pt_regs(&regs,fn,arg);
 
-	pid = do_fork(regs,0,flag);
-
-	if(!pid)
+	if(!do_fork(regs,0,flag)){
+		kernel_error("create kernel thread failed\n");
 		return -ENOMEM;
+	}
 		
+	return 0;
+}
+
+int build_idle_task(void)
+{
+	idle = kmalloc(sizeof(struct task_struct),GFP_KERNEL);
+	if(idle == NULL){
+		return -ENOMEM;
+	}
+
+	idle->pid = get_new_pid(idle);
+	if(idle->pid != 0){
+		return -EFATAL;
+	}
+	idle->uid = 0;
+
+	strncpy(idle->name,"idle",15);
+	idle->state = TASK_STATE_RUNNING;
+	idle->bin = NULL;
+	idle->flag = 0 | PROCESS_TYPE_KERNEL;
+
+	idle->parent = NULL;
+	init_list(&idle->child);
+	init_list(&idle->p);
+
+	init_mutex(&idle->mutex);
+	init_sched_struct(idle);
+
+	/*
+	 * add task,because kernel already have memory,we
+	 * do not allocate memory for him
+	 */
+	add_new_task(idle);
+	current = idle;
+	next_run = idle;
+
 	return 0;
 }

@@ -63,13 +63,14 @@ software_interrupt:
 	.align 5
 prefetch_abort:
 	subs lr, lr, #4
-	stmfd sp!, {r0-r3, lr}
+	stmfd sp!, {r0-r1, lr}
 	ldmfd sp!, {r0-r12,pc}^
 
 	.align 5
 data_abort:
 	subs lr, lr, #8
-	stmfd sp!, {r0-r3, lr}
+	stmfd sp!, {r0-r12, lr}
+	bl data_abort_handler
 	ldmfd sp!, {r0-r12, pc}^
 	
 	.align 5
