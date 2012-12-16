@@ -146,6 +146,10 @@ int init_sched_struct(struct task_struct *task)
 		sched->pre_prio = sched->prio;
 	}
 
+	/*
+	 * this value will be set to a default value
+	 * later
+	 */
 	sched->run_time = 0;
 	sched->wait_time = 0;
 	sched->time_out = 0;
@@ -205,14 +209,16 @@ int add_new_task(struct task_struct *task)
 		return 1;
 
 	/*
-	 *fix me:using mutex may take some issue
-	 *will fix it later
+	 * fix me:using mutex may take some issue
+	 * will fix it later
 	 */
 	mutex_lock(&sched_mutex);
 
 	sched_list_add_task(system,sched);
-	set_task_state(task,TASK_STATE_PREPARE);
-	prio_list_add_task_tail(sched);
+	if(task->pid != 0){
+		set_task_state(task,TASK_STATE_PREPARE);
+		prio_list_add_task_tail(sched);
+	}
 
 	mutex_unlock(&sched_mutex);
 
@@ -225,6 +231,9 @@ static void find_next_run_task(void)
 	struct list_head *task_head;
 	struct sched_struct *sched;
 
+	/*
+	 *idle process is always on preparing state
+	 */
 	for(i=0;i<MAX_PRIO;i++){
 		if(os_sched_table[i].count)
 			break;
@@ -237,23 +246,49 @@ static void find_next_run_task(void)
 
 static void prepare_to_switch(void)
 {
+	struct sched_struct *current_s = &current->sched;
+	struct sched_struct *next_s = &next_run->sched;
+
+	current_s->run_time = 0;
 	/*
-	current->wait_time = get_waitting_slice(current->prio);	//
-	current->run_time = 0;
-	sched_list_add_task(sleep,current);			//sleep for a second,then other task have time to run.
-	set_task_state(current,TASK_STATE_SLEEP);
+	 * frist we check that whether the state of the task
+	 * has been set to a correct state.if no we will take
+	 * next actions:
+	 * if shced is hapeend in interrupt context,we need 
+	 * set the current process to sleep state.and set his
+	 * watting time which he must wait for next running.
+	 * Otherwise we will set the current to prepare state,
+	 * when sched() is called by process itself.
+	 */
+	if(in_interrupt){
+		current_s->wait_time = get_waitting_slice(current_s->prio);	
+		sched_list_add_task(sleep,current_s);
+		set_task_state(current,TASK_STATE_SLEEP);
+	}
+	else{
+		prio_list_add_task_tail(current_s);		
+		if(get_task_state(current) != TASK_STATE_RUNNING){
+			set_task_state(current,TASK_STATE_PREPARE);
+		}
+		current_s->wait_time = 0;
+	}
 
-	next_run->run_count++;
-	next_run->run_time = get_running_slice(next_run->prio);
-	next_run->wait_time = 0;
-	prio_list_del_task(next_run);
+	/*
+	 * notic:the running task must be choose from the prio
+	 * list and can not be select from sleep list directly.
+	 * so a running task must following the below state 
+	 * sequence to run agin:
+	 * 1)sleep->prepare->running
+	 * 2)idle->prepare->running
+	 */
+	next_s->run_count++;
+	next_s->run_time = get_running_slice(next_s->prio);
+	next_s->wait_time = 0;
+	/*
+	 *delete from prepare list and ready to run.
+	 */
+	prio_list_del_task(next_s);
 	set_task_state(next_run,TASK_STATE_RUNNING);
-*/
-}
-
-static void inline switch_task_sw(void)
-{
-	arch_switch_task_sw();
 }
 
 static void inline switch_task_hw(void)
@@ -263,6 +298,8 @@ static void inline switch_task_hw(void)
 
 void sched(void)
 {
+	int i;
+
 	if(in_interrupt){
 		kernel_debug("Do not call sched in interrupt\n");
 		return;
@@ -279,10 +316,18 @@ void sched(void)
 		goto re_run;
 	}
 	prepare_to_switch();
-	switch_task_sw();
+
+	/*
+	 * in below function, the task will be change to next_run.
+	 * and the lr or the return address will be set to re_run
+	 * which eque to enable_irq. and this function is a arch 
+	 * specfic function.
+	 */
+	arch_switch_task_sw();
 
 re_run:
-	enable_irqs();
+	i = 0;
+	//enable_irqs();
 }
 
 int os_tick_handler(void *arg)
@@ -303,7 +348,7 @@ int os_tick_handler(void *arg)
 
 		if(sched->wait_time == 0){
 			sched_list_del_task(sleep,sched);
-			prio_list_add_task(sched);
+			prio_list_add_task_tail(sched);
 		}
 	}
 	

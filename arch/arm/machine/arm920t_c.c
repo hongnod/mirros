@@ -275,7 +275,7 @@ void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
 	regs->sp = 0;
 	regs->lr = (u32)fn;
 	regs->pc = 0;
-	regs->cpsr = SVC_MODE;
+	regs->cpsr = SVC_MODE | NO_INT;
 }
 
 int arch_set_up_process(pt_regs *regs,struct task_struct *task)
@@ -334,4 +334,9 @@ int arch_set_task_return_value(pt_regs *reg,
 void data_abort_handler(void)
 {
 	panic("data abort\n");
+}
+
+void prefetch_abort_handler(void)
+{
+	panic("prefetch abort\n");
 }

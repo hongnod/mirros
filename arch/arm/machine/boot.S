@@ -184,7 +184,7 @@ init_mmu:
 	.align 5
 
 _start_kernel:	.word main
-domain_data:	.word (0x55555550 | 0<<2 | 1<<0)
+domain_data:	.word (0x55555555)	@set all domain to client mode
 
 boot_error:
 	mov r0, #0

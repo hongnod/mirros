@@ -3,7 +3,7 @@
 
 #include <asm/asm_sched.h>
 
-int kthread_run(int (*fn)(void *arg), void *arg);
+int kthread_run(char *name,int (*fn)(void *arg), void *arg);
 pid_t sys_fork(pt_regs regs,u32 sp);
 
 #endif

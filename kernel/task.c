@@ -412,7 +412,7 @@ static int inline set_task_return_value(pt_regs *reg,
 	return arch_set_task_return_value(reg,task);
 }
 
-static pid_t do_fork(pt_regs regs,u32 sp,u32 flag)
+static pid_t do_fork(char *name,pt_regs regs,u32 sp,u32 flag)
 {
 	pid_t pid;
 	struct task_struct *new;
@@ -428,6 +428,9 @@ static pid_t do_fork(pt_regs regs,u32 sp,u32 flag)
 	if(pid == 0){
 		kernel_error("invaild pid \n");
 		goto exit;
+	}
+	if(name){
+		strncpy(new->name,name,15);
 	}
 	
 	/*
@@ -463,7 +466,7 @@ pid_t sys_fork(pt_regs regs,u32 sp)
 
 	flag |= PROCESS_TYPE_USER;
 
-	return do_fork(regs,sp,flag);
+	return do_fork(NULL,regs,sp,flag);
 }
 
 static void inline init_pt_regs(pt_regs *regs,int (*fn)(void *arg),void *arg)
@@ -475,7 +478,7 @@ static void inline init_pt_regs(pt_regs *regs,int (*fn)(void *arg),void *arg)
 	arch_init_pt_regs(regs,fn,arg);
 }
 
-int kthread_run(int (*fn)(void *arg),void *arg)
+int kthread_run(char *name,int (*fn)(void *arg),void *arg)
 {
 	u32 flag = 0;
 	pt_regs regs;
@@ -483,11 +486,11 @@ int kthread_run(int (*fn)(void *arg),void *arg)
 	flag |= PROCESS_TYPE_KERNEL;	
 	init_pt_regs(&regs,fn,arg);
 
-	if(!do_fork(regs,0,flag)){
+	if(!do_fork(name,regs,0,flag)){
 		kernel_error("create kernel thread failed\n");
 		return -ENOMEM;
 	}
-		
+
 	return 0;
 }
 

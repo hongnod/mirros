@@ -1,6 +1,8 @@
 /*
 *basic opreation for arm920 MMU
 */
+#include "include/arm920t.h"
+
 	.text
 
 .global get_cpu_id
@@ -254,7 +256,43 @@ set_process_id:
  */
 .global arch_switch_task_sw
 arch_switch_task_sw:
-	mov pc, lr
+	push {lr}		@frist we must restore the process context.
+	sub sp, sp, #4		@sp
+	push {r0-r12}		@r0-r12
+	mrs r0, cpsr
+	push {r0}		@cpsr or spsr
+
+	mrs r1, cpsr
+	msr cpsr, #SYSTEM_MODE | NO_INT
+	mov r0, sp
+	msr cpsr, r1
+	str r0, [sp, #56]	@sp of user space
+
+	ldr r0, =current
+	ldr r1, =next_run
+
+	ldr r2, [r0]		@store sp to current process.
+	str sp, [r2]
+
+	ldr r2, [r1]
+	str r2, [r0]		@current = next_run
+
+	ldr r2, [r1]
+	ldr sp, [r2]		@load sp of next_run.
+
+	ldr r0, [sp,#56]	@user sp
+	msr cpsr_c, #SYSTEM_MODE | NO_INT
+	mov sp, r0
+	msr cpsr_c, #SVC_MODE | NO_INT
+
+	pop {r0}		@cpsr
+	msr spsr, r0
+
+	pop {r0-r12}		@r0-r12
+
+	add sp, sp, #4		@lr
+	
+	ldmfd sp!, {pc}^
 
 .global arch_switch_task_hw
 arch_switch_task_hw:

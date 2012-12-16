@@ -64,6 +64,7 @@ software_interrupt:
 prefetch_abort:
 	subs lr, lr, #4
 	stmfd sp!, {r0-r1, lr}
+	bl prefetch_abort_handler
 	ldmfd sp!, {r0-r12,pc}^
 
 	.align 5

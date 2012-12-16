@@ -56,7 +56,7 @@ int main(void)
 		panic("can not build kernel task\n");
 	}
 
-	kthread_run(printk_thread,"hello world\n");
+	kthread_run("hello",printk_thread,"hello world\n");
 #if 0
 	while(1){
 		buf = (char *)kmalloc(640,GFP_KERNEL);
