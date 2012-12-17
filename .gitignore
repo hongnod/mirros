@@ -1,0 +1,9 @@
+*.o
+*.i
+*.s
+cscope.*
+tags
+.gitignore
+boot.elf
+boot.bin
+
