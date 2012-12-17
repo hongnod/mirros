@@ -79,43 +79,55 @@ not_used:
 	mov r0, r0
 
 	.align 5
+
 irq:
 	sub lr, lr, #4
-	push {lr}
+	str lr, [sp, #-4]
 	mrs lr, spsr					@store register in irq mode
-	push {lr}
+	str lr, [sp, #-8]
+	str r0, [sp, #-12]
+	str r1, [sp, #-16]
 
-	set_mode SVC_MODE | NO_INT			@change to svc mode and store r0-r12 to stack
+	mrs r1, cpsr					@change to system mode to get the stack base of user space and store to r1
+	msr cpsr, #SYSTEM_MODE | NO_INT
+	mov r0, sp
+	msr cpsr, r1					@change to irq mode and get lr and spsr
+	mov r1, sp					@r0 = user sp, r1 = irq sp;
+	
+	msr cpsr, #SVC_MODE | NO_INT
 	sub sp, sp, #8
-	push {r0-r12}
-	
-	set_mode SYSTEM_MODE | NO_INT		@change to system mode to get the stack base of user space and store to r1
-	mov r1, sp
-	set_mode IRQ_MODE | NO_INT			@change to irq mode and get lr and spsr
-	pop {r2,r3}					@r1= user sp, r2=spsr,r3=lr
-	
-	set_mode  SVC_MODE | NO_INT			@push the three register to the stack of svc mode.
+	push {r2-r12}					@restore r2-r12
+	ldr r2, [r1, #-12]
+	ldr r3, [r1, #-16]
+	push {r2,r3}					@r0 and r1
+	ldr r2, [r1, #-8]				@cpsr
 	push {r2}
-	str r1,[sp, #56]
-	str r3,[sp, #60]
 
-	bl irq_handler
+	ldr r2, [r1, #-4]				@lr
+	str r2, [sp, #60]
+	str r0, [sp, #56]				@sp
 
 	set_mode IRQ_MODE | NO_INT
-	bl os_exit_irq					@need copy the contex to irq stack from svc stack (process kernel stack)
+	bl irq_handler
+	set_mode SVC_MODE | NO_INT
+	mov r0, sp
+	add sp, sp, #64
+	set_mode IRQ_MODE | NO_INT
 
-	ldr r1, [sp, #56]				@restroe the sp point of the user space
+	ldr r1, [r0, #56]				@restroe the sp point of the user space
 	set_mode SYSTEM_MODE | NO_INT
 	mov sp, r1				
 	set_mode IRQ_MODE | NO_INT
 
-	pop {r0}					@restore spsr
-	msr spsr_csxf, r0				
-	pop {r0-r12}					@restore r0-r12
+	ldmfd r0!, {r1}
+	msr spsr, r1
 
-	add sp ,sp, #4					@sp has benn restored,so add 4 to sp
+	mov lr, r0
+	ldmfd lr!, {r0-r12}
+
+	add lr, lr, #4					@sp has benn restored,so add 4 to sp
 	
-	ldmfd sp!, {pc}^				@switch to another process or return to the current process
+	ldmfd lr!, {pc}^				@switch to another process or return to the current process
 
 	.align 5
 fiq:

@@ -105,13 +105,13 @@ int timer_tick_init(void)
 		return -ENOMEM;
 	}
 
-	register_irq(TIMER0,platform_timer_tick_handler,NULL);
+	register_irq(TIMER4,platform_timer_tick_handler,NULL);
 	
-	iowrite32(249,timer_base + TCFG0);
-	iowrite32(0,timer_base+TCFG1);
-	iowrite32(64536,timer_base +TCNTB0);
-	iowrite32(2,timer_base + TCON);
-	iowrite32(9,timer_base + TCON);
+	iowrite32(249 << 8,timer_base + TCFG0);
+	iowrite32(0 << 16,timer_base+TCFG1);
+	iowrite16(64536,timer_base +TCNTB4);
+	iowrite32(1<<21,timer_base + TCON);
+	iowrite32(bit(20) | bit(22),timer_base + TCON);
 
 	return 0;
 }

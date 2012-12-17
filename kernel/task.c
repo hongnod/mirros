@@ -294,6 +294,7 @@ static int alloc_kernel_stack(struct task_struct *task)
 		return -EINVAL;
 
 	task->stack_base = get_free_pages(KERNEL_STACK_SIZE>>PAGE_SHIFT,GFP_KERNEL);
+	kernel_debug("task %s stack is 0x%x\n",task->name,(u32)task->stack_base);
 	if(task->stack_base == NULL){
 		return -ENOMEM;
 	}

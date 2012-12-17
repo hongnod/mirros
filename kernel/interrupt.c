@@ -27,19 +27,14 @@ int register_irq(int nr,int (*fn)(void *arg),void *arg)
 	return arch_register_irq(nr,fn,arg);
 }
 
-void do_irq_handler(int nr)
+int do_irq_handler(int nr)
 {
 	struct irq_des *des;
-	int ret = 0;
 
 	des = get_irq_description(nr);
-	if(des){
-		printk("get an unknow irq\n");
-		return;
+	if(!des){
+		return -EINVAL;
 	}
 	
-	ret = des->fn(des->arg);
-	if(ret){
-		printk("something error in irq handler %d\n",nr);
-	}
+	return des->fn(des->arg);
 }

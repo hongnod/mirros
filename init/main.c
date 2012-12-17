@@ -19,11 +19,12 @@ extern int arch_irq_init(void);
 extern int trap_init(void);
 extern int timer_tick_init(void);
 extern int build_idle_task(void);
+extern int arch_init_exception_stack(void);
 
 int printk_thread(void *arg)
 {
 	while(1){
-		printk("%s\n",(char *)arg);
+		printk("%s kernel process 2\n",(char *)arg);
 		sched();
 	}
 
@@ -49,14 +50,16 @@ int main(void)
 	console_late_init();
 	slab_init();
 	trap_init();
+	arch_init_exception_stack();
 	arch_irq_init();
 	sched_init();
 	timer_tick_init();
+	enable_irqs();
 	if(build_idle_task()){
 		panic("can not build kernel task\n");
 	}
 
-	kthread_run("hello",printk_thread,"hello world\n");
+	kthread_run("hello",printk_thread,"hello world");
 #if 0
 	while(1){
 		buf = (char *)kmalloc(640,GFP_KERNEL);
@@ -70,7 +73,7 @@ int main(void)
 #endif
 	printk("begin to loop");
 	while(1){
-		kernel_info("in idle\n");
+		printk("in idle kernel process 1\n");
 		sched();
 	}
 

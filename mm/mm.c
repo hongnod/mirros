@@ -352,6 +352,8 @@ static int init_page_table_map(unsigned long kernel_end)
 	_page_map = (u32 *)(baligin(tmp,sizeof(u32)));
 	tmp = (unsigned long)(_page_map + bits_to_long(bank->total_page));
 
+	memset((char *)_page_map,0,tmp - (unsigned long)_page_map);
+
 	size = tmp - kernel_start;
 	size = baligin(size,PAGE_SIZE);
 	zone->free_size = zone->free_size - size;
@@ -881,8 +883,8 @@ void *get_free_page_aligin(unsigned long aligin,u32 flag)
 		for(j = section->vir_start; j < (section->vir_start) + (section->size); j += SIZE_1M){
 			
 			id = va_to_page_id(j); 
-			j += offset;
-			if(!page_state(j)){
+			id += offset;
+			if(!page_state(id)){
 				goto out;
 			}
 		}
@@ -890,18 +892,17 @@ void *get_free_page_aligin(unsigned long aligin,u32 flag)
 	/*
 	 * if have not find the page we need, set it to 0.
 	 */
-	j = 0;
-
+	id = 0;
 out:
-	if(j){
-		update_memory_bitmap(j,1,1);
+	if(id){
+		update_memory_bitmap(id,1,1);
 
 		zone->free_size = zone->free_size - PAGE_SIZE;
 		zone->free_pages = zone->free_pages - 1;
 
 		mutex_unlock(&zone->zone_mutex);
 
-		page = init_pages(j,1,flag);
+		page = init_pages(id,1,flag);
 		
 		return ((void *)page_to_va(page));
 	}

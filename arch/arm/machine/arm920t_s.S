@@ -266,7 +266,7 @@ arch_switch_task_sw:
 	msr cpsr, #SYSTEM_MODE | NO_INT
 	mov r0, sp
 	msr cpsr, r1
-	str r0, [sp, #56]	@sp of user space
+	str r0, [sp,#56]	@sp of user space
 
 	ldr r0, =current
 	ldr r1, =next_run
@@ -280,7 +280,7 @@ arch_switch_task_sw:
 	ldr r2, [r1]
 	ldr sp, [r2]		@load sp of next_run.
 
-	ldr r0, [sp,#56]	@user sp
+	ldr r0, [sp, #56]	@user sp
 	msr cpsr_c, #SYSTEM_MODE | NO_INT
 	mov sp, r0
 	msr cpsr_c, #SVC_MODE | NO_INT
@@ -298,28 +298,30 @@ arch_switch_task_sw:
 arch_switch_task_hw:
 	mov pc, lr
 
-
 .global os_exit_irq
 os_exit_irq:
-/*
-	ldr r0, current
-	ldr r1, next_run
-	cmp r0,r1
 
+	ldr r0, =current		@compare current and next run, check whether need switch to another task
+	ldr r1, =next_run
+	ldr r2, [r0]
+	ldr r3, [r1]
+	cmp r2,r3
 	beq exit
 
-	ldr r2,[r1]			@get the stack of next run
-	
-	set_mode SVC_MODE
-	str sp, [r0]
-	mov sp,[r2,#60]
-	set_mode IRQ_MODE
-	
-	ldmfd r2!,{r3,r4,r5,r6,r7}
-	stmfd sp!,{r3,r4,r5,r6,r7}
-	ldmfd r2!,{r3,r4,r5,r6,r7}
-	stmfd sp!,{r3,r4,r5,r6,r7}
-	ldmfd r2!,{r3,r4,r5,r6,r7}
-	stmfd sp!,{r3,r4,r5,r6,r7}
+	msr cpsr_c, #SVC_MODE | NO_INT
+
 exit:
-*/	mov pc,lr
+	ldr r2,[r0]			@get the stack of next run
+	
+	@set_mode SVC_MODE
+	str sp, [r0]
+	@mov sp,[r2,#60]
+	@set_mode IRQ_MODE
+	
+	ldmfd r2!,{r3,r4,r5,r6,r7}
+	stmfd sp!,{r3,r4,r5,r6,r7}
+	ldmfd r2!,{r3,r4,r5,r6,r7}
+	stmfd sp!,{r3,r4,r5,r6,r7}
+	ldmfd r2!,{r3,r4,r5,r6,r7}
+	stmfd sp!,{r3,r4,r5,r6,r7}
+	mov pc,lr

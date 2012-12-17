@@ -298,8 +298,6 @@ static void inline switch_task_hw(void)
 
 void sched(void)
 {
-	int i;
-
 	if(in_interrupt){
 		kernel_debug("Do not call sched in interrupt\n");
 		return;
@@ -326,8 +324,7 @@ void sched(void)
 	arch_switch_task_sw();
 
 re_run:
-	i = 0;
-	//enable_irqs();
+	enable_irqs();
 }
 
 int os_tick_handler(void *arg)

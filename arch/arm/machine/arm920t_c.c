@@ -153,7 +153,6 @@ void irq_handler(void)
 {
 	int nr;
 
-	printk("irq_handler\n");
 	/*
 	 *first get irq number, then clean irq pending
 	 */
@@ -175,7 +174,6 @@ struct irq_des *arch_get_irq_description(int nr)
 
 	ret = base + nr;
 	if(ret->fn == NULL){
-		kernel_debug("description of irq %d has not been register\n",nr);
 		return NULL;
 	}
 
@@ -275,7 +273,7 @@ void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
 	regs->sp = 0;
 	regs->lr = (u32)fn;
 	regs->pc = 0;
-	regs->cpsr = SVC_MODE | NO_INT;
+	regs->cpsr = SVC_MODE;
 }
 
 int arch_set_up_process(pt_regs *regs,struct task_struct *task)
@@ -339,4 +337,40 @@ void data_abort_handler(void)
 void prefetch_abort_handler(void)
 {
 	panic("prefetch abort\n");
+}
+
+void arch_set_mode_stack(u32 base,u32 mode)
+{
+	/*
+	 *r0 = base, r1=mode
+	 */
+	asm(
+		"push {r2}\n\t"
+		"mrs r2,cpsr\n\t"
+		"msr cpsr_c, r1\n\t"
+		"mov sp, r0\n\t"
+		"msr cpsr, r2\n\t"
+		"pop {r2}"
+	);
+}
+
+#define MODE_STACK_SIZE		SIZE_4K
+int arch_init_exception_stack(void)
+{
+	u32 stack_base;
+
+	stack_base = (u32)get_free_pages(3 * page_nr(MODE_STACK_SIZE),GFP_KERNEL);
+	if(stack_base == 0){
+		kernel_error("can not allcate memory for exception mode\n");
+		return -ENOMEM;
+	}
+
+	 stack_base += MODE_STACK_SIZE;
+	 arch_set_mode_stack(stack_base,IRQ_MODE);
+	 stack_base += MODE_STACK_SIZE;
+	 arch_set_mode_stack(stack_base,ABORT_MODE);
+	 stack_base += MODE_STACK_SIZE;
+	 arch_set_mode_stack(stack_base,UNDEF_MODE);
+
+	 return 0;
 }
