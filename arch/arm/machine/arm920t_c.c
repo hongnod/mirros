@@ -95,16 +95,6 @@ static void arch_remap_vector(void)
 	);
 }
 
-static void invalidate_id_cache(void)
-{
-	asm(
-		"push {r0}\n\t"
-		"mcr p15,0,r0,c7,c7,0\n\t"
-		"pop {r0}\n\t"
-	);
-
-}
-
 static void invalidate_all_tlb(void)
 {
 	asm(
@@ -119,7 +109,6 @@ static void invalidate_all_tlb(void)
 
 void arch_flush_mmu_tlb(void)
 {
-	invalidate_id_cache();
 	invalidate_all_tlb();
 }
 
