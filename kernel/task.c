@@ -31,6 +31,9 @@ static pid_t init_task_struct(struct task_struct *task,u32 flag)
 {
 	struct task_struct *parent;
 
+	/*
+	 * if thread is a kernel thread, his parent is idle
+	 */
 	if(flag & PROCESS_TYPE_KERNEL){
 		parent = idle;
 	}
@@ -58,7 +61,11 @@ static pid_t init_task_struct(struct task_struct *task,u32 flag)
 	task->parent = parent;
 	init_list(&task->p);
 	init_list(&task->child);
+	init_mutex(&task->mutex);
+
+	mutex_lock(&parent->mutex);
 	list_add(&parent->child,&task->p);
+	mutex_unlock(&parent->mutex);
 	
 	/*
 	 * before init mm_struct and sched_struct.
@@ -323,6 +330,7 @@ static int alloc_memory_for_task(struct task_struct *task)
 		ret = alloc_memory_and_map(task);
 		if(ret){
 			kernel_error("no enough memory for task\n");
+			goto error;
 		}
 	}
 
@@ -443,6 +451,10 @@ static pid_t do_fork(char *name,pt_regs regs,u32 sp,u32 flag)
 		goto exit;
 	}
 
+	/*
+	 * if the task is a kernel task, we do not need to copy
+	 * process to it
+	 */
 	if(flag & PROCESS_TYPE_KERNEL)
 		goto setup_and_add_task;
 
@@ -458,7 +470,7 @@ setup_and_add_task:
 exit:
 	kfree(new);
 
-	return -1;
+	return ret;
 }
 
 pid_t sys_fork(pt_regs regs,u32 sp)
@@ -487,6 +499,7 @@ int kthread_run(char *name,int (*fn)(void *arg),void *arg)
 	flag |= PROCESS_TYPE_KERNEL;	
 	init_pt_regs(&regs,fn,arg);
 
+	kernel_debug("ready to fork a new task %s\n",name);
 	if(!do_fork(name,regs,0,flag)){
 		kernel_error("create kernel thread failed\n");
 		return -ENOMEM;
@@ -495,7 +508,7 @@ int kthread_run(char *name,int (*fn)(void *arg),void *arg)
 	return 0;
 }
 
-int build_idle_task(void)
+int run_idle_task(void)
 {
 	idle = kmalloc(sizeof(struct task_struct),GFP_KERNEL);
 	if(idle == NULL){
@@ -504,6 +517,7 @@ int build_idle_task(void)
 
 	idle->pid = get_new_pid(idle);
 	if(idle->pid != 0){
+		kfree(idle);
 		return -EFATAL;
 	}
 	idle->uid = 0;
@@ -519,14 +533,19 @@ int build_idle_task(void)
 
 	init_mutex(&idle->mutex);
 	init_sched_struct(idle);
-
 	/*
 	 * add task,because kernel already have memory,we
 	 * do not allocate memory for him
 	 */
-	add_new_task(idle);
+
 	current = idle;
 	next_run = idle;
+
+	/*
+	 * after add the ilde task, the kernel is runing 
+	 * and the irqs is enable.
+	 */
+	add_new_task(idle);
 
 	return 0;
 }

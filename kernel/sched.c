@@ -86,6 +86,7 @@ static void prio_list_add_task_tail(struct sched_struct *sched)
 {
 	list_add_tail(&os_sched_table[sched->prio].list,&sched->prio_running);
 	os_sched_table[sched->prio].count++;
+	kernel_debug("add a new task for %d\n",sched->prio);
 }
 
 static void inline prio_list_del_task(struct sched_struct *sched)
@@ -130,15 +131,30 @@ static int init_pid_allocater(void)
 	return 0;	
 }
 
+static void get_task_run_time(struct sched_struct *sched)
+{
+	sched->run_time = 10;
+}
+
+static void get_task_wait_time(struct sched_struct *sched)
+{
+	sched->wait_time = 10;
+}
+
 int init_sched_struct(struct task_struct *task)
 {
 	struct sched_struct *sched = &task->sched;
 
-	if(task->parent){
+	if( (task->parent) && (task->parent != idle)){
 		sched->prio = task->parent->sched.prio;
 		sched->pre_prio = task->parent->sched.pre_prio;
 	}
-	else{
+	else if ( (task->parent) && (task->parent == idle) ){
+		/*kernel thread*/
+		sched->prio = KERNEL_THREAD_PRIO;
+		sched->pre_prio = KERNEL_THREAD_PRIO;
+	}
+	else {
 		/*
 		 * idle process
 		 */
@@ -150,8 +166,8 @@ int init_sched_struct(struct task_struct *task)
 	 * this value will be set to a default value
 	 * later
 	 */
-	sched->run_time = 0;
-	sched->wait_time = 0;
+	get_task_run_time(sched);
+	get_task_wait_time(sched);
 	sched->time_out = 0;
 	sched->run_count = 0;
 	
@@ -209,18 +225,18 @@ int add_new_task(struct task_struct *task)
 		return 1;
 
 	/*
-	 * fix me:using mutex may take some issue
-	 * will fix it later
+	 * when add new task to system, we need disable irqs
+	 * first.
 	 */
-	mutex_lock(&sched_mutex);
+	disable_irqs();
 
 	sched_list_add_task(system,sched);
-	if(task->pid != 0){
+	if(task->pid > 0){
 		set_task_state(task,TASK_STATE_PREPARE);
 		prio_list_add_task_tail(sched);
 	}
 
-	mutex_unlock(&sched_mutex);
+	enable_irqs();
 
 	return 0;
 }
@@ -234,14 +250,17 @@ static void find_next_run_task(void)
 	/*
 	 *idle process is always on preparing state
 	 */
-	for(i=0;i<MAX_PRIO;i++){
-		if(os_sched_table[i].count)
+	for(i=0; i < MAX_PRIO; i++){
+		if(os_sched_table[i].count){
+			kernel_debug("find new process to run in prio %d\n",i);
 			break;
+		}
 	}
 
 	task_head = &os_sched_table[i].list;
 	sched = list_first_entry(task_head,struct sched_struct,prio_running);
 	next_run = container_of(sched,struct task_struct,sched);
+	printk("next run task %d stack is 0x%x\n",sched->prio,next_run->stack_base);
 }
 
 static void prepare_to_switch(void)
@@ -261,7 +280,7 @@ static void prepare_to_switch(void)
 	 * when sched() is called by process itself.
 	 */
 	if(in_interrupt){
-		current_s->wait_time = get_waitting_slice(current_s->prio);	
+		get_task_wait_time(current_s);	
 		sched_list_add_task(sleep,current_s);
 		set_task_state(current,TASK_STATE_SLEEP);
 	}
@@ -282,7 +301,7 @@ static void prepare_to_switch(void)
 	 * 2)idle->prepare->running
 	 */
 	next_s->run_count++;
-	next_s->run_time = get_running_slice(next_s->prio);
+	get_task_run_time(next_s);
 	next_s->wait_time = 0;
 	/*
 	 *delete from prepare list and ready to run.
@@ -332,7 +351,7 @@ int os_tick_handler(void *arg)
 	struct list_head *list;
 	struct sched_struct *sched;
 	struct sched_struct *sched_current = &current->sched;
-
+	
 	/*
 	 * look up for each task in sleep list,if task is waitting
 	 * for his time to run again,the sub his wait_time,otherwise 
@@ -348,7 +367,7 @@ int os_tick_handler(void *arg)
 			prio_list_add_task_tail(sched);
 		}
 	}
-	
+
 	/*
 	 * for the current task, first decrease his run_timem,if his 
 	 * run time is over, then find another task to run,but now we 
@@ -357,15 +376,25 @@ int os_tick_handler(void *arg)
 	 */
 	sched_current->run_time--;
 	if(sched_current->run_time == 0){
+
 		find_next_run_task();
-		if(next_run == current)
-			goto exit;
-		prepare_to_switch();
+
+		if(next_run == current){
+			get_task_run_time(sched_current);
+		}
+		else{
+			prepare_to_switch();
+		}
 	}
 
-exit:
-	sched_current->run_time = get_running_slice(sched_current->prio);
+	return 0;
+}
 
+int switch_task(struct task_struct *cur,
+		struct task_struct *next)
+{
+	//printk("current task 0x%x \n", cur->stack_base);
+	//printk("next run task 0x%x \n", next->stack_base);
 	return 0;
 }
 

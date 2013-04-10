@@ -96,7 +96,7 @@ irq:
 	
 	msr cpsr, #SVC_MODE | NO_INT
 	sub sp, sp, #8
-	push {r2-r12}					@restore r2-r12
+	push {r2-r12}					@store r2-r12
 	ldr r2, [r1, #-12]
 	ldr r3, [r1, #-16]
 	push {r2,r3}					@r0 and r1
@@ -109,9 +109,18 @@ irq:
 
 	set_mode IRQ_MODE | NO_INT
 	bl irq_handler
-	set_mode SVC_MODE | NO_INT
-	mov r0, sp
-	add sp, sp, #64
+	
+	ldr r0, =current				@compare current and next run, 
+							@check whether need switch to another task
+	ldr r1, =next_run
+	ldr r2, [r0]
+	ldr r3, [r1]
+
+	bl os_exit_irq
+
+	set_mode SVC_MODE | NO_INT			@do not need switch task, restore the process context.
+	mov sp, r0					@backup of sp to r0 then we can use it in irq mode
+	add sp, sp, #64					@adjust sp to right value which before irq come
 	set_mode IRQ_MODE | NO_INT
 
 	ldr r1, [r0, #56]				@restroe the sp point of the user space
@@ -130,6 +139,7 @@ irq:
 	ldmfd lr!, {pc}^				@switch to another process or return to the current process
 
 	.align 5
+
 fiq:
 	sub lr, lr, #4
 	stmfd sp!, {lr}
@@ -151,4 +161,3 @@ fiq:
 	ldmfd sp!, {r0-r4, r12, r14}
 	msr spsr_csxf, r14
 	ldmfd sp!, {pc}^				@return 
-

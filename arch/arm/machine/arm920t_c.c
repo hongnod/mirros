@@ -145,28 +145,16 @@ void irq_handler(void)
 	/*
 	 *first get irq number, then clean irq pending
 	 */
+	//printk("in irq\n");
 	nr = platform_get_irq_id();
 	platform_irq_clean_pending();
 
 	do_irq_handler(nr);
 }
 
-struct irq_des *arch_get_irq_description(int nr)
+inline struct irq_des *arch_get_irq_description(int nr)
 {
-	struct irq_des *base = (struct irq_des*)irq_table_base;
-	struct irq_des *ret = NULL;
-
-	if(nr < 0 || nr > (IRQ_NR-1)){
-		kernel_error("irq number is not correct\n");
-		return NULL;
-	}
-
-	ret = base + nr;
-	if(ret->fn == NULL){
-		return NULL;
-	}
-
-	return ret;
+	return ((struct irq_des*)irq_table_base) + nr;
 }
 
 int arch_register_irq(int nr,int (*fn)(void *arg),void *arg)
@@ -177,14 +165,13 @@ int arch_register_irq(int nr,int (*fn)(void *arg),void *arg)
 	 */
 	struct irq_des *des = arch_get_irq_description(nr);
 
-	if( (des !=NULL) && (des->fn == NULL) ){
+	if( (des) && (des->fn == NULL) ){
 		des->fn = fn;
 		des->arg = arg;
+		platform_enable_irq(nr);
 
 		return 0;
 	}
-
-	platform_enable_irq(nr);
 
 	return 1;
 }
@@ -244,6 +231,10 @@ int trap_init(void)
 	return 0;
 }
 
+/*
+ * when run a kernel thread, we need this function to 
+ * init the values of each registers.
+ */
 void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
 {
 	regs->r0 = (u32)arg;

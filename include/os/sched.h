@@ -29,6 +29,8 @@ typedef enum _task_state{
 #define TASK_MAP_ELF	1
 #define TASK_MAP_HEAP	2
 #define TASK_MAP_MASK	0x0f
+
+#define KERNEL_THREAD_PRIO	5
 /*
  *elf_size: the size of all elf section. at first we will 
  *allocate elf_size to load all section of elf file;
@@ -104,6 +106,10 @@ struct task_struct{
 
 	struct sched_struct sched;
 
+	/* mutex for this task_struct
+	 * when need to modify the data of this task_struct
+	 * we must get this mutex
+	 */
 	struct mutex mutex;
 
 	void *message;

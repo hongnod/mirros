@@ -3,6 +3,10 @@
 */
 #include "include/arm920t.h"
 
+.macro set_mode, mode
+msr cpsr_c, #\mode
+.endm
+
 	.text
 
 .global get_cpu_id
@@ -298,30 +302,37 @@ arch_switch_task_sw:
 arch_switch_task_hw:
 	mov pc, lr
 
+/* r0 = &current
+ * r1 = &next_run
+ * r2 = current
+ * r3 = next_run
+ * we are in irq mode
+ */
 .global os_exit_irq
 os_exit_irq:
+	cmp r2, r3
+	beq out
 
-	ldr r0, =current		@compare current and next run, check whether need switch to another task
-	ldr r1, =next_run
+	set_mode SVC_MODE | NO_INT
+	str sp, [r2]			@save current stack to current process
+	set_mode IRQ_MODE | NO_INT
+
+	mov r0, r2
+	mov r1, r3
+	push {lr}
+	bl switch_task
+	pop {lr}
+
+	ldr r0, = current
+	ldr r1, = next_run
 	ldr r2, [r0]
 	ldr r3, [r1]
-	cmp r2,r3
-	beq exit
-
-	msr cpsr_c, #SVC_MODE | NO_INT
-
-exit:
-	ldr r2,[r0]			@get the stack of next run
 	
-	@set_mode SVC_MODE
-	str sp, [r0]
-	@mov sp,[r2,#60]
-	@set_mode IRQ_MODE
-	
-	ldmfd r2!,{r3,r4,r5,r6,r7}
-	stmfd sp!,{r3,r4,r5,r6,r7}
-	ldmfd r2!,{r3,r4,r5,r6,r7}
-	stmfd sp!,{r3,r4,r5,r6,r7}
-	ldmfd r2!,{r3,r4,r5,r6,r7}
-	stmfd sp!,{r3,r4,r5,r6,r7}
+	str r3, [r0]			@current = next_run	
+	ldr r0, [r3]			@r0 = stack of next task
+	mov pc, lr
+out:
+	set_mode SVC_MODE | NO_INT
+	mov r0, sp
+	set_mode IRQ_MODE | NO_INT
 	mov pc,lr

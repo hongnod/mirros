@@ -104,14 +104,14 @@ int timer_tick_init(void)
 		kernel_error("timer tick init failed\n");
 		return -ENOMEM;
 	}
-
-	register_irq(TIMER4,platform_timer_tick_handler,NULL);
 	
 	iowrite32(249 << 8,timer_base + TCFG0);
 	iowrite32(0 << 16,timer_base+TCFG1);
 	iowrite16(64536,timer_base +TCNTB4);
 	iowrite32(1<<21,timer_base + TCON);
 	iowrite32(bit(20) | bit(22),timer_base + TCON);
+
+	register_irq(TIMER4,platform_timer_tick_handler,NULL);
 
 	return 0;
 }
@@ -317,12 +317,13 @@ int console_late_init(void)
 
 int uart_puts(char *buf)
 {
+	char ch;
+
 	while(*buf){
-		platform_uart0_send_byte(*buf++);
+		ch = *buf;
+		platform_uart0_send_byte(ch);
+		buf++;
 	}
 	
-	platform_uart0_send_byte(0x0d);
-	platform_uart0_send_byte(0x0a);
-
 	return strlen(buf);
 }
