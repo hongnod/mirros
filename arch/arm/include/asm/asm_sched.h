@@ -21,9 +21,10 @@ typedef struct _pt_regs{
 	u32 r12;
 	u32 sp;
 	u32 lr;
+	u32 lr_prev;
 	u32 pc;
 	u32 cpsr;
-	/*u32 spsr*/		
+	u32 spsr;
 }pt_regs;
 
 void arch_switch_task_sw(void);

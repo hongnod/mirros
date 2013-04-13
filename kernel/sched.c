@@ -110,11 +110,6 @@ static int inline sched_table_empty(int i)
 	return !(os_sched_table[i].count);
 }
 
-static int get_running_slice(int prio)
-{
-	return ((prio*MAX_RUNNING_SLICE)/MAX_PRIO); 
-}
-
 static int init_pid_allocater(void)
 {
 	init_mutex(&pid_map.pid_map_mutex);
@@ -133,12 +128,7 @@ static int init_pid_allocater(void)
 
 static void get_task_run_time(struct sched_struct *sched)
 {
-	sched->run_time = 10;
-}
-
-static void get_task_wait_time(struct sched_struct *sched)
-{
-	sched->wait_time = 10;
+	sched->run_time = MAX_PRIO - sched->prio;
 }
 
 int init_sched_struct(struct task_struct *task)
@@ -167,7 +157,7 @@ int init_sched_struct(struct task_struct *task)
 	 * later
 	 */
 	get_task_run_time(sched);
-	get_task_wait_time(sched);
+	sched->wait_time = -1;
 	sched->time_out = 0;
 	sched->run_count = 0;
 	
@@ -210,11 +200,6 @@ out:
 	mutex_unlock(&map->pid_map_mutex);
 
 	return 0;
-}
-
-static int get_waitting_slice(int prio)
-{
-	return (((MAX_PRIO-prio)*MAX_RUNNING_SLICE)/MAX_PRIO);
 }
 
 int add_new_task(struct task_struct *task)
@@ -278,7 +263,6 @@ static void prepare_to_switch(void)
 	 * when sched() is called by process itself.
 	 */
 	if(in_interrupt){
-		get_task_wait_time(current_s);	
 		sched_list_add_task(sleep,current_s);
 		set_task_state(current,TASK_STATE_SLEEP);
 	}
@@ -287,7 +271,7 @@ static void prepare_to_switch(void)
 		if(get_task_state(current) != TASK_STATE_RUNNING){
 			set_task_state(current,TASK_STATE_PREPARE);
 		}
-		current_s->wait_time = 0;
+		current_s->wait_time = -1;
 	}
 
 	/*
@@ -300,7 +284,7 @@ static void prepare_to_switch(void)
 	 */
 	next_s->run_count++;
 	get_task_run_time(next_s);
-	next_s->wait_time = 0;
+	next_s->wait_time = -1;
 	/*
 	 *delete from prepare list and ready to run.
 	 */
@@ -357,9 +341,12 @@ int os_tick_handler(void *arg)
 	 */
 	sched_list_for_each(sleep,list){
 		sched = list_entry(list,struct sched_struct,sleep);
-		if(sched->wait_time)
+		if(sched->wait_time > 0)
 			sched->wait_time--;
 
+		/*
+		 * task has timeout and need to wake up
+		 */
 		if(sched->wait_time == 0){
 			sched_list_del_task(sleep,sched);
 			prio_list_add_task_tail(sched);
@@ -391,8 +378,6 @@ int os_tick_handler(void *arg)
 int switch_task(struct task_struct *cur,
 		struct task_struct *next)
 {
-	//printk("current task 0x%x \n", cur->stack_base);
-	//printk("next run task 0x%x \n", next->stack_base);
 	return 0;
 }
 

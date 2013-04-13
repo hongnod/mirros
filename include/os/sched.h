@@ -12,7 +12,6 @@
 #define MAX_PRIO		64
 #define MAX_PID			0XFFFF
 #define TASK_DEFAULT_PRIO	20
-#define MAX_RUNNING_SLICE	500
 
 typedef enum _task_state{
 	TASK_STATE_PREPARE,
@@ -118,6 +117,7 @@ struct task_struct{
 extern struct task_struct *current;
 extern struct task_struct *idle;
 extern struct task_struct *next_run;
+extern int in_interrupt;
 
 void set_task_state(struct task_struct *task,state_t state);
 state_t get_task_state(struct task_struct *task);

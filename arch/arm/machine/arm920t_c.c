@@ -250,6 +250,8 @@ void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
 	regs->r10 = 10;
 	regs->r11 = 11;
 	regs->r12 = 12;
+	regs->spsr = 0;
+	regs->lr_prev = 0;
 	regs->sp = 0;
 	regs->lr = (u32)fn;
 	regs->pc = 0;
@@ -277,6 +279,8 @@ int arch_set_up_process(pt_regs *regs,struct task_struct *task)
 	 * kernel task, this value will no effect.
 	 */
 	*(--stack_base) = regs->sp;	
+	*(--stack_base) = regs->lr_prev;
+	*(--stack_base) = regs->spsr;
 	*(--stack_base) = regs->r12;
 	*(--stack_base) = regs->r11;
 	*(--stack_base) = regs->r10;

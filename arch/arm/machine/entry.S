@@ -95,7 +95,7 @@ irq:
 	mov r1, sp					@r0 = user sp, r1 = irq sp;
 	
 	msr cpsr, #SVC_MODE | NO_INT
-	sub sp, sp, #8
+	sub sp, sp, #16
 	push {r2-r12}					@store r2-r12
 	ldr r2, [r1, #-12]
 	ldr r3, [r1, #-16]
@@ -104,8 +104,12 @@ irq:
 	push {r2}
 
 	ldr r2, [r1, #-4]				@lr
-	str r2, [sp, #60]
-	str r0, [sp, #56]				@sp
+	str r2, [sp, #68]
+	str r0, [sp, #64]				@sp
+
+	mrs r0, spsr
+	str r0, [sp, #56]				@spsr
+	str lr, [sp, #60]				@lr_svc
 
 	set_mode IRQ_MODE | NO_INT
 	bl irq_handler
@@ -120,10 +124,13 @@ irq:
 
 	set_mode SVC_MODE | NO_INT			@do not need switch task, restore the process context.
 	mov sp, r0					@backup of sp to r0 then we can use it in irq mode
-	add sp, sp, #64					@adjust sp to right value which before irq come
+	ldr lr, [sp, #60]
+	ldr r1, [sp, #60]
+	msr spsr, r1
+	add sp, sp, #72					@adjust sp to right value which before irq come
 	set_mode IRQ_MODE | NO_INT
 
-	ldr r1, [r0, #56]				@restroe the sp point of the user space
+	ldr r1, [r0, #64]				@restroe the sp point of the user space
 	set_mode SYSTEM_MODE | NO_INT
 	mov sp, r1				
 	set_mode IRQ_MODE | NO_INT
@@ -134,7 +141,7 @@ irq:
 	mov lr, r0
 	ldmfd lr!, {r0-r12}
 
-	add lr, lr, #4					@sp has benn restored,so add 4 to sp
+	add lr, lr, #12					@sp has benn restored,so add 12 to sp
 	
 	ldmfd lr!, {pc}^				@switch to another process or return to the current process
 
