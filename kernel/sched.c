@@ -231,10 +231,7 @@ int add_new_task(struct task_struct *task)
 	disable_irqs();
 
 	sched_list_add_task(system,sched);
-	if(task->pid > 0){
-		set_task_state(task,TASK_STATE_PREPARE);
-		prio_list_add_task_tail(sched);
-	}
+	prio_list_add_task_tail(sched);
 
 	enable_irqs();
 
@@ -250,7 +247,7 @@ static void find_next_run_task(void)
 	/*
 	 *idle process is always on preparing state
 	 */
-	for(i=0; i < MAX_PRIO; i++){
+	for(i=0; i < MAX_PRIO - 1; i++){
 		if(os_sched_table[i].count){
 			kernel_debug("find new process to run in prio %d\n",i);
 			break;
@@ -259,8 +256,9 @@ static void find_next_run_task(void)
 
 	task_head = &os_sched_table[i].list;
 	sched = list_first_entry(task_head,struct sched_struct,prio_running);
-	next_run = container_of(sched,struct task_struct,sched);
-	printk("next run task %d stack is 0x%x\n",sched->prio,next_run->stack_base);
+	next_run = list_entry(sched,struct task_struct,sched);
+	kernel_debug("next run task 0x%x stack is 0x%x\n",sched->prio,next_run->stack_base);
+	kernel_debug("current  task 0x%x stack is 0x%x\n",current->sched.prio,current->stack_base);
 }
 
 static void prepare_to_switch(void)

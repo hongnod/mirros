@@ -463,6 +463,7 @@ static pid_t do_fork(char *name,pt_regs regs,u32 sp,u32 flag)
 
 setup_and_add_task:
 	set_up_process(&regs,new);
+	set_task_state(new, TASK_STATE_PREPARE);
 	add_new_task(new);
 
 	return pid;
@@ -523,7 +524,6 @@ int run_idle_task(void)
 	idle->uid = 0;
 
 	strncpy(idle->name,"idle",15);
-	idle->state = TASK_STATE_RUNNING;
 	idle->bin = NULL;
 	idle->flag = 0 | PROCESS_TYPE_KERNEL;
 
@@ -545,6 +545,7 @@ int run_idle_task(void)
 	 * after add the ilde task, the kernel is runing 
 	 * and the irqs is enable.
 	 */
+	set_task_state(idle, TASK_STATE_RUNNING);
 	add_new_task(idle);
 
 	return 0;
