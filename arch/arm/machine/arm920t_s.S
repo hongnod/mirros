@@ -261,7 +261,7 @@ set_process_id:
 .global arch_switch_task_sw
 arch_switch_task_sw:
 	push {lr}		@frist we must restore the process context.
-	sub sp, sp, #4		@sp
+	sub sp, sp, #12		@sp
 	push {r0-r12}		@r0-r12
 	mrs r0, cpsr
 	push {r0}		@cpsr or spsr
@@ -270,7 +270,11 @@ arch_switch_task_sw:
 	msr cpsr, #SYSTEM_MODE | NO_INT
 	mov r0, sp
 	msr cpsr, r1
-	str r0, [sp,#56]	@sp of user space
+	str r0, [sp, #64]	@sp of user space
+
+	mrs r0, spsr
+	str r0, [sp, #56]	@spsr
+	str lr, [sp, #60]	@lr
 
 	ldr r0, =current
 	ldr r1, =next_run
@@ -281,7 +285,6 @@ arch_switch_task_sw:
 	ldr r2, [r1]
 	str r2, [r0]		@current = next_run
 
-	ldr r2, [r1]
 	ldr sp, [r2]		@load sp of next_run.
 
 	ldr r0, [sp, #56]	@user sp
@@ -290,13 +293,19 @@ arch_switch_task_sw:
 	msr cpsr_c, #SVC_MODE | NO_INT
 
 	pop {r0}		@cpsr
+	msr cpsr, r0
+
+	ldr r0, [sp, #52]	@spsr
 	msr spsr, r0
+
+	ldr r0, [sp, #56]	@lr
+	mov lr, r0
 
 	pop {r0-r12}		@r0-r12
 
-	add sp, sp, #4		@lr
+	add sp, sp, #12		@lr
 	
-	ldmfd sp!, {pc}^
+	ldmfd sp!, {pc}
 
 .global arch_switch_task_hw
 arch_switch_task_hw:

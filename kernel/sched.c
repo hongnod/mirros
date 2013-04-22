@@ -128,7 +128,7 @@ static int init_pid_allocater(void)
 
 static void get_task_run_time(struct sched_struct *sched)
 {
-	sched->run_time = MAX_PRIO - sched->prio;
+	sched->run_time = 1;
 }
 
 int init_sched_struct(struct task_struct *task)
@@ -255,24 +255,14 @@ static void prepare_to_switch(void)
 	/*
 	 * frist we check that whether the state of the task
 	 * has been set to a correct state.if no we will take
-	 * next actions:
-	 * if shced is hapeend in interrupt context,we need 
-	 * set the current process to sleep state.and set his
-	 * watting time which he must wait for next running.
-	 * Otherwise we will set the current to prepare state,
-	 * when sched() is called by process itself.
+	 * next actions, we add current task to the tail of 
+	 * the list.
 	 */
-	if(in_interrupt){
-		sched_list_add_task(sleep,current_s);
-		set_task_state(current,TASK_STATE_SLEEP);
+	prio_list_add_task_tail(current_s);
+	if(get_task_state(current) != TASK_STATE_RUNNING){
+		set_task_state(current,TASK_STATE_PREPARE);
 	}
-	else{
-		prio_list_add_task_tail(current_s);		
-		if(get_task_state(current) != TASK_STATE_RUNNING){
-			set_task_state(current,TASK_STATE_PREPARE);
-		}
-		current_s->wait_time = -1;
-	}
+	current_s->wait_time = -1;
 
 	/*
 	 * notic:the running task must be choose from the prio
