@@ -14,6 +14,8 @@ struct irq_des{
 int do_irq_handler(int nr);
 void disable_irqs(void);
 void enable_irqs(void);
+void enter_critical(unsigned long *val);
+void exit_critical(unsigned long *val);
 int register_irq(int nr,int (*fn)(void *arg),void *arg);
 
 #endif

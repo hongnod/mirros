@@ -16,6 +16,16 @@ void inline disable_irqs(void)
 	arch_disable_irqs();
 }
 
+void inline enter_critical(unsigned long *val)
+{
+	arch_enter_critical(val);
+}
+
+void inline exit_critical(unsigned long *val)
+{
+	arch_exit_critical(val);
+}
+
 static struct irq_des *get_irq_description(int nr)
 {
 	return arch_get_irq_description(nr);
@@ -23,10 +33,17 @@ static struct irq_des *get_irq_description(int nr)
 
 int register_irq(int nr,int (*fn)(void *arg),void *arg)
 {
+	int err = 0;
+	unsigned long flags;
+
 	if( (nr > IRQ_NR-1) || (fn == NULL) )
 		return -EINVAL;
 
-	return arch_register_irq(nr,fn,arg);
+	enter_critical(&flags);
+	err = arch_register_irq(nr,fn,arg);
+	exit_critical(&flags);
+
+	return err;
 }
 
 int do_irq_handler(int nr)

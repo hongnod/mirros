@@ -7,6 +7,8 @@
 #include <asm/asm_sched.h>
 #include <asm/config.h>
 
+extern int in_interrupt;
+
 #define KERNEL_STACK_SIZE	ARCH_KERNEL_STACK_SIZE
 
 #define MAX_PRIO		64
@@ -125,5 +127,7 @@ int add_new_task(struct task_struct *task);
 void sched(void);
 pid_t get_new_pid(struct task_struct *task);
 int init_sched_struct(struct task_struct *task);
+int sleep_task_timeout(struct task_struct *task, int timeout);
+int wakeup_task(struct task_struct *task);
 
 #endif

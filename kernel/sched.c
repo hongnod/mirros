@@ -205,6 +205,7 @@ out:
 int add_new_task(struct task_struct *task)
 {
 	struct sched_struct *sched = &task->sched;
+	unsigned long flags;
 	
 	if(!task)
 		return 1;
@@ -213,12 +214,12 @@ int add_new_task(struct task_struct *task)
 	 * when add new task to system, we need disable irqs
 	 * first.
 	 */
-	disable_irqs();
+	enter_critical(&flags);
 
 	sched_list_add_task(system,sched);
 	prio_list_add_task_tail(sched);
 
-	enable_irqs();
+	exit_critical(&flags);
 
 	return 0;
 }
@@ -289,6 +290,8 @@ static void inline switch_task_hw(void)
 
 void sched(void)
 {
+	unsigned long flags; 
+
 	if(in_interrupt){
 		kernel_debug("Do not call sched in interrupt\n");
 		return;
@@ -298,7 +301,7 @@ void sched(void)
 		return;
 	}
 
-	disable_irqs();
+	enter_critical(&flags);
 
 	find_next_run_task();
 	if(next_run == current){
@@ -315,7 +318,7 @@ void sched(void)
 	arch_switch_task_sw();
 
 re_run:
-	enable_irqs();
+	exit_critical(&flags);
 }
 
 int os_tick_handler(void *arg)
@@ -367,6 +370,16 @@ int os_tick_handler(void *arg)
 
 int switch_task(struct task_struct *cur,
 		struct task_struct *next)
+{
+	return 0;
+}
+
+int sleep_task_timeout(struct task_struct *task, int timeout)
+{
+	return 0;
+}
+
+int wakeup_task(struct task_struct *task)
 {
 	return 0;
 }

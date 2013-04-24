@@ -138,6 +138,28 @@ void arch_enable_irqs(void)
 	);	
 }
 
+void arch_enter_critical(unsigned long *val)
+{
+	asm (
+		"push {r1}\n\t"
+		"mrs r1, cpsr\n\t"
+		"str r1, [r0]\n\t"
+		"orr r1, r1, #0xc0\n\t"
+		"msr cpsr_c, r1\n\t"
+		"pop {r1}\n\t"
+	);
+}
+
+void arch_exit_critical(unsigned long *val)
+{
+	asm(
+		"push {r1}\n\t"
+		"ldr r1, [r0]\n\t"
+		"msr cpsr_c, r1\n\t"
+		"pop {r1}\n\t"
+	);	
+}
+
 void irq_handler(void)
 {
 	int nr;
