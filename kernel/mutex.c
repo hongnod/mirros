@@ -11,7 +11,7 @@ int mutex_lock_timeout(struct mutex *m, int ms)
 	unsigned long flags;
 	int timeout = 0;
 
-	if (in_interrupt){
+	if (in_interrupt) {
 		kernel_info("waring: maybe sleep in interrupt\n");
 	}
 
@@ -29,10 +29,10 @@ int mutex_lock_timeout(struct mutex *m, int ms)
 			 * if mutex has been locked, then suspend this task
 			 * if task suspend timeout, del it form the list.
 			 */
-			list_add_tail(&m->wait, &task->sched.wait);
+			list_add_tail(&m->wait, &task->wait);
 			timeout = suspend_task_timeout(task, ms);
 			if (timeout) {
-				list_del(task);
+				list_del(&task->wait);
 				goto out;
 			}
 		}
@@ -50,7 +50,6 @@ out:
 void mutex_unlock(struct mutex *m)
 {
 	struct list_head *list;
-	struct sched_struct *sched;
 	struct task_struct *task;
 	unsigned long flags;
 
@@ -75,11 +74,11 @@ void mutex_unlock(struct mutex *m)
 	 * the mutex.
 	 */
 	list_for_each((&m->wait), list) {
-		sched = list_entry(list,struct sched_struct, wait);
-		task = container_of(sched, struct task_struct, sched);
-		list_del(&sched->wait);
+		task = list_entry(list,struct task_struct, wait);
+		list_del(&task->wait);
 		wakeup_task(task);
 	}
+
 	exit_critical(&flags);
 }
 

@@ -46,26 +46,6 @@ struct mm_struct{
 	struct list_head elf_list;
 };
 
-struct sched_struct{
-	int run_time;
-	int wait_time;
-	int time_out;
-	u32 run_count;
-
-	int prio;
-	int pre_prio;
-
-	struct list_head prio_running;
-	struct list_head system;
-	struct list_head sleep;
-	//struct list_head prepare;
-	struct list_head idle;
-
-	/*for mutex*/
-	struct list_head wait;
-
-};
-
 /*
  * task_struct:represent a process in the kernel
  * stack_base:the base address of stack of one task
@@ -105,11 +85,35 @@ struct task_struct{
 	struct list_head child;
 	struct list_head p;
 
-	struct sched_struct sched;
+	/*
+	 * below member are used to schedule.
+	 * run_time: each task have his run slice
+	 * wait_time: if a task was wait for a event, this
+	 *	     member can set to the wait time
+	 * time_out: wether this task wait for someting time out
+	 * run_count: how many time has this task runed.
+	 * prio: the prio of this task
+	 * pre_prio: previous prio of this task
+	 * prio_running: if the task is in running state, this list is
+	 * attach to the prio prepare list.
+	 * wiat : when task was wait for a mutex or other things, this 
+	 * list is attach to them
+	 */
+	int run_time;
+	int wait_time;
+	int time_out;
+	u32 run_count;
+	int prio;
+	int pre_prio;
+	struct list_head prio_running;
+	struct list_head system;
+	struct list_head sleep;
+	struct list_head idle;
+	struct list_head wait;
 
 	/* mutex for this task_struct
 	 * when need to modify the data of this task_struct
-	 * we must get this mutex
+	 * we must get this mutex TBD
 	 */
 	struct mutex mutex;
 

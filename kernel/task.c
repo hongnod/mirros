@@ -509,7 +509,7 @@ int kthread_run(char *name,int (*fn)(void *arg),void *arg)
 	return 0;
 }
 
-int run_idle_task(void)
+int build_idle_task(void)
 {
 	idle = kmalloc(sizeof(struct task_struct),GFP_KERNEL);
 	if(idle == NULL){
