@@ -1,4 +1,4 @@
-obj-c = init.o main.o
+obj-c = init.o main.o init_task.o
 
 out-dir := $(OUT_KERNEL)
 

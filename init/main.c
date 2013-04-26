@@ -8,6 +8,7 @@
 #include <os/panic.h>
 #include <os/task.h>
 #include <os/sched.h>
+#include <os/interrupt.h>
 
 extern int mm_init(void);
 extern int init_platform_info(void);
@@ -18,17 +19,9 @@ extern int console_late_init(void);
 extern int arch_irq_init(void);
 extern int trap_init(void);
 extern int timer_tick_init(void);
-extern int run_idle_task(void);
+extern int build_idle_task(void);
 extern int arch_init_exception_stack(void);
-
-int printk_thread(void *arg)
-{
-	while(1){
-		printk("%s kernel process 2\n",(char *)arg);
-	}
-
-	return 0;
-}
+extern int init_task();
 
 int main(void)
 {
@@ -54,26 +47,21 @@ int main(void)
 	sched_init();
 	timer_tick_init();
 
-	if(run_idle_task()){
+	if(build_idle_task()){
 		panic("can not build kernel task\n");
 	}
 
-	kthread_run("hello",printk_thread,"hello world");
-	kthread_run("hello2",printk_thread, "fuck hello");
-#if 0
-	while(1){
-		buf = (char *)kmalloc(640,GFP_KERNEL);
-		if(!buf){
-			printk("no more memory\n");
-			break;
-		}
-		memset(buf,1,640);
-		printk("buf = 0x%x\n",(unsigned int)buf);
+	/*
+	 *now we can enable irq
+	 */
+	enable_irqs();
+
+	init_task();
+
+	for (;;) {
+		printk("In Idle State\n");
+		sched();
 	}
-#endif
-	printk("begin to loop\n");
-	while(1){
-		printk("in idle process\n");
-	}
+
 	return 0;
 }
