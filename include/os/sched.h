@@ -127,7 +127,9 @@ int add_new_task(struct task_struct *task);
 void sched(void);
 pid_t get_new_pid(struct task_struct *task);
 int init_sched_struct(struct task_struct *task);
-int sleep_task_timeout(struct task_struct *task, int timeout);
+int suspend_task_timeout(struct task_struct *task, int timeout);
 int wakeup_task(struct task_struct *task);
+
+#define suspend_task(task)	suspend_task_timeout(task, -1);
 
 #endif

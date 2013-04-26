@@ -12,8 +12,8 @@ struct mutex{
 	struct mutex name = {	\
 		.count = 0,	\
 		.wait = {	\
-			.pre = &wait,	\
-			.next = &wait,	\
+			.pre = &name.wait,	\
+			.next = &name.wait,	\
 		}			\
 	}
 
@@ -24,7 +24,9 @@ static void inline init_mutex(struct mutex *m)
 	m->wait.next = &m->wait;
 }
 
-void mutex_lock(struct mutex *m);
+int mutex_lock_timeout(struct mutex *m, int ms);
 void mutex_unlock(struct mutex *m);
+
+#define mutex_lock(m)	mutex_lock_timeout(m, -1)
 
 #endif

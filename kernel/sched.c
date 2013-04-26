@@ -59,6 +59,12 @@ int in_interrupt = 0;
 		task_##name.count++;		\
 	}while(0)
 
+#define sched_list_add_task_tail(name,sched)		\
+	do{					\
+		list_add_tail(&task_##name.list,&sched->name);  \
+		task_##name.count++;		\
+	}while(0)
+
 #define sched_list_del_task(name,sched)	\
 	do{						\
 		list_del(&sched->name);	\
@@ -86,7 +92,6 @@ static void prio_list_add_task_tail(struct sched_struct *sched)
 {
 	list_add_tail(&os_sched_table[sched->prio].list,&sched->prio_running);
 	os_sched_table[sched->prio].count++;
-	kernel_debug("add a new task for %d\n",sched->prio);
 }
 
 static void inline prio_list_del_task(struct sched_struct *sched)
@@ -235,7 +240,6 @@ static void find_next_run_task(void)
 	 */
 	for(i=0; i < MAX_PRIO - 1; i++){
 		if(os_sched_table[i].count){
-			kernel_debug("find new process to run in prio %d\n",i);
 			break;
 		}
 	}
@@ -243,27 +247,31 @@ static void find_next_run_task(void)
 	task_head = &os_sched_table[i].list;
 	sched = list_first_entry(task_head,struct sched_struct,prio_running);
 	next_run = list_entry(sched,struct task_struct,sched);
-	kernel_debug("next run task 0x%x stack is 0x%x\n",sched->prio,next_run->stack_base);
-	kernel_debug("current  task 0x%x stack is 0x%x\n",current->sched.prio,current->stack_base);
 }
 
 static void prepare_to_switch(void)
 {
 	struct sched_struct *current_s = &current->sched;
 	struct sched_struct *next_s = &next_run->sched;
+	state_t state = get_task_state(current);
 
-	current_s->run_time = 0;
 	/*
 	 * frist we check that whether the state of the task
 	 * has been set to a correct state.if no we will take
 	 * next actions, we add current task to the tail of 
 	 * the list.
 	 */
-	prio_list_add_task_tail(current_s);
-	if(get_task_state(current) != TASK_STATE_RUNNING){
+	if (state == TASK_STATE_RUNNING) {
 		set_task_state(current,TASK_STATE_PREPARE);
+		prio_list_add_task_tail(current_s);
 	}
-	current_s->wait_time = -1;
+	else if (state == TASK_STATE_SLEEP) {
+		/*
+		 *this task is suspended by himself
+		 */
+		sched_list_add_task(sleep, current_s);
+	}
+	current_s->run_time = 0;
 
 	/*
 	 * notic:the running task must be choose from the prio
@@ -272,10 +280,17 @@ static void prepare_to_switch(void)
 	 * sequence to run agin:
 	 * 1)sleep->prepare->running
 	 * 2)idle->prepare->running
+	 *
+	 * if next_run wait_time < 0, seems he is timeout
 	 */
 	next_s->run_count++;
 	get_task_run_time(next_s);
+
+	if (next_s->wait_time == 0) {
+		next_s->time_out = 1;
+	}
 	next_s->wait_time = -1;
+
 	/*
 	 *delete from prepare list and ready to run.
 	 */
@@ -334,14 +349,17 @@ int os_tick_handler(void *arg)
 	 */
 	sched_list_for_each(sleep,list){
 		sched = list_entry(list,struct sched_struct,sleep);
-		if(sched->wait_time > 0)
+		if(sched->wait_time > 0){
 			sched->wait_time--;
+		}
 
 		/*
 		 * task has timeout and need to wake up
 		 */
 		if(sched->wait_time == 0){
 			sched_list_del_task(sleep,sched);
+			set_task_state(container_of(sched, struct task_struct, sched),
+					TASK_STATE_PREPARE);
 			prio_list_add_task_tail(sched);
 		}
 	}
@@ -374,13 +392,66 @@ int switch_task(struct task_struct *cur,
 	return 0;
 }
 
-int sleep_task_timeout(struct task_struct *task, int timeout)
+int suspend_task_timeout(struct task_struct *task, int timeout)
 {
-	return 0;
+	struct sched_struct *sched_s;
+	state_t state;
+	unsigned long flags;
+
+	if (!task || !timeout) {
+		return -EINVAL;
+	}
+	sched_s = &task->sched;
+
+	enter_critical(&flags);
+
+	/*
+	 * get the state of the task, if task state is idle
+	 * then return;
+	 */
+	state = get_task_state(task);
+	if (state == TASK_STATE_RUNNING) {
+		set_task_state(task, TASK_STATE_SLEEP);
+	}
+	else {
+		/*
+		 * only running task can directly go to sleep state
+		 */
+		exit_critical(&flags);
+		return -EINVAL;
+	}
+
+	/*
+	 * set task timeout, and remove it from current list
+	 * then add it to sleep list.
+	 */
+	sched_s->wait_time = timeout;
+	sched_s->time_out = 0;
+
+	exit_critical(&flags);
+
+	sched();
+
+	return sched_s->time_out;
 }
 
 int wakeup_task(struct task_struct *task)
 {
+	struct sched_struct *sched_s;
+	unsigned long flags;
+
+	if (get_task_state(task) != TASK_STATE_SLEEP)
+		return -EINVAL;
+
+	enter_critical(&flags);
+
+	sched_s = &task->sched;
+	sched_list_del_task(sleep, sched_s);
+	set_task_state(task, TASK_STATE_PREPARE);
+	prio_list_add_task(sched_s);
+
+	exit_critical(&flags);
+
 	return 0;
 }
 
