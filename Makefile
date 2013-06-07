@@ -26,6 +26,7 @@ object = $(obj-boot) $(obj-arch) $(obj-kernel)
 boot_elf := $(OUT)/boot.elf
 boot_bin := $(OUT)/boot.bin
 boot_dump :=$(OUT)/boot.s
+ramdisk := ramdisk/ramdisk.img
 
 $(boot_bin) : $(boot_elf)
 	$(OBJ_COPY) -O binary $(boot_elf) $(boot_bin)

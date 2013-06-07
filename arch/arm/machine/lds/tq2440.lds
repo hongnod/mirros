@@ -28,6 +28,7 @@ SECTIONS
 	}
 	__init_call_end = .;
 
+
 	_bss_start = .;
 	.bss : {*(.bss)}
 	_bss_end = .;

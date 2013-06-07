@@ -6,4 +6,5 @@ tags
 .gitignore
 boot.elf
 boot.bin
+tools/pc.log
 

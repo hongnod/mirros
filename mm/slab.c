@@ -26,7 +26,9 @@ struct slab_header{
  *
  * page_current: current page used to allocat slab header
  * table_list: connect the all page that used to allcated page header
- * free_header:when used kfree() to free a allocted memory,the header will free too.then when need a free header to record allocated memory ,this list can help to find free headers quickly
+ * free_header:when used kfree() to free a allocted memory,the header will free too.
+ *	then when need a free header to record allocated memory ,this list
+ *	can help to find free headers quickly
  * table_total_pages:how many page habe been used as slab header
  * page_current:the current page in table_list
  * header_in_page:the current free slab_header in page
