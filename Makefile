@@ -26,7 +26,6 @@ object = $(obj-boot) $(obj-arch) $(obj-kernel)
 boot_elf := $(OUT)/boot.elf
 boot_bin := $(OUT)/boot.bin
 boot_dump :=$(OUT)/boot.s
-ramdisk := ramdisk/ramdisk.img
 
 $(boot_bin) : $(boot_elf)
 	$(OBJ_COPY) -O binary $(boot_elf) $(boot_bin)
@@ -35,7 +34,15 @@ $(boot_bin) : $(boot_elf)
 $(boot_elf) : $(object) $(LDS)
 	$(LD) $(LDFLAG) -o $(boot_elf) $(object) $(LDPATH)
 
-$(object): subsystem
+ramdisk : genramdisk
+	@echo "@@@@@@@@@ Generate Ramdisk for mirros @@@@@@@@@@@@"
+	@tools/genramdisk/genramdisk ./ramdisk out/ramdisk.img
+	@echo "@@@@@@@@@         End              @@@@@@@@@@@@"
+
+genramdisk: tools/genramdisk/genramdisk.c tools/genramdisk/ramdisk.h
+	@gcc -o tools/genramdisk/genramdisk tools/genramdisk/genramdisk.c
+
+$(object): ramdisk subsystem
 
 subsystem: mkdir
 	@make all -C arch/arm/machine
@@ -52,7 +59,8 @@ mkdir:
 
 clean:
 	@rm -rf $(OUT)
+	@rm -rf tools/genramdisk/genramdisk
 	@echo "all build have been removed"
 
 run: 
-	@cd tools && ./sy.sh
+	@cd tools/skyeye && ./sy.sh

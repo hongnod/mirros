@@ -7,4 +7,5 @@ tags
 boot.elf
 boot.bin
 tools/pc.log
-
+out/
+tools/genramdisk/genramdisk

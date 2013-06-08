@@ -4,4 +4,4 @@
 __ramdisk_start:	.word ramdisk_start
 
 ramdisk_start:
-	.incbin "../../../ramdisk/ramdisk.img"
+	.incbin "../../../out/ramdisk.img"
