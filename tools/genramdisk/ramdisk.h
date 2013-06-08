@@ -3,14 +3,15 @@
 
 #define FILE_NAME_SIZE 32
 
-#include <os/types.h>
+#define u32 unsigned int 
+#define s32 int
 
 struct ramdisk_header {
 	char name[16];
 	s32 total_size;
 	s32 file_count;	
 	u32 unused;
-	void *data;
+	u32 unused2;
 };
 
 struct file_header {
@@ -24,12 +25,5 @@ struct file {
 	u32 size;
 	u32 curr;
 };
-
-
-int ramdisk_read(struct file *file, char *buf, int size, u32 offset);
-int ramdisk_seek(struct file *file, u32 offset);
-
-#define fs_read ramdisk_read
-#define fs_seek ramdisk_seek
 
 #endif

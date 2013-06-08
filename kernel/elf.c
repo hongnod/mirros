@@ -96,7 +96,7 @@ struct elf_file *get_elf_info(struct file *file)
 
 	ret = fs_read(file,(char *)&hdr,sizeof(elf_header),0);
 	if(ret < 0){
-		kernel_error("read elf file 0x%x error at 0x%x offset 0",file->fd,
+		kernel_error("read elf file error at 0x%x offset 0",
 						sizeof(elf_header));
 		return NULL;
 	}
@@ -134,7 +134,7 @@ struct elf_file *get_elf_info(struct file *file)
 
 	ret = fs_seek(file,hdr.e_shoff);
 	if(ret < 0){
-		printk("seek elf file %x failed\n",file->fd);
+		printk("seek elf file failed\n");
 		return NULL;
 	}
 	
