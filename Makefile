@@ -42,9 +42,9 @@ ramdisk : genramdisk
 genramdisk: tools/genramdisk/genramdisk.c tools/genramdisk/ramdisk.h
 	@gcc -o tools/genramdisk/genramdisk tools/genramdisk/genramdisk.c
 
-$(object): ramdisk subsystem
+$(object): subsystem
 
-subsystem: mkdir
+subsystem: mkdir ramdisk
 	@make all -C arch/arm/machine
 	@cd mm/ && make
 	@cd kernel/ && make

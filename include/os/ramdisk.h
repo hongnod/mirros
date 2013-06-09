@@ -26,10 +26,14 @@ struct file {
 };
 
 
-int ramdisk_read(struct file *file, char *buf, int size, u32 offset);
+int ramdisk_read(struct file *file, char *buf, int size);
 int ramdisk_seek(struct file *file, u32 offset);
+struct file *ramdisk_open(char *name);
+void ramdisk_close(struct file *file);
 
-#define fs_read ramdisk_read
-#define fs_seek ramdisk_seek
+#define fs_read		ramdisk_read
+#define fs_seek 	ramdisk_seek
+#define fs_open 	ramdisk_open
+#define fs_close 	ramdisk_close
 
 #endif

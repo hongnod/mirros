@@ -82,6 +82,12 @@ int __gen_ramdisk(int fd, char *buf, char *path)
 		printf("%-32s    %-32d    %-32d\n", file_header->name,
 					file_header->base,
 					file_header->size);
+		/*
+		 * 4 byte aligin
+		 */
+		if ((file_header->size % 4) != 0) {
+			file_data_base += 4 - (file_header->size % 4);
+		}
 
 		close(file);
 		file_header ++;

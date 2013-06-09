@@ -22,7 +22,7 @@ unsigned long mount_ramdisk(void)
 	 *get ramdisk header to check wether it is a correct ramdisk image
 	 */
 	ramdisk_header = (struct ramdisk_header *)__ramdisk_start;
-	if(!strcmp(ramdisk_header->name, "ramdisk")) {
+	if (strcmp(ramdisk_header->name, "ramdisk")) {
 		ramdisk_header = NULL;
 		kernel_error("Not a correct ramdisk\n");
 		goto exit;
@@ -31,6 +31,10 @@ unsigned long mount_ramdisk(void)
 	if (ramdisk_header->file_count == 0) {
 		kernel_info("No file in ramdisk\n");
 	}
+
+	kernel_info("find ramdisk : size 0x%x file_count %d\n",
+			ramdisk_header->total_size,
+			ramdisk_header->file_count);
 	
 	/*
 	 *get the address of file table.
@@ -42,28 +46,38 @@ exit:
 }
 
 
-int ramdisk_read(struct file *file, char *buf, int size, u32 offset)
+int ramdisk_read(struct file *file, char *buf, int size)
 {
-	int copy_size = 0;
+	int copy_size = size;
 	unsigned char *start = (unsigned char *)file->curr;
-	start = start + offset;
+	int old_size = 0;
 
 	if (!file)
 		return 0;
 
-	if( (unsigned long)(start + size) > (file->base + file->size)) {
+	if ( (unsigned long)(start + size) > (file->base + file->size)) {
 		copy_size = (unsigned char *)(file->base + file->size) - start;
 	}
-	
-	for(; copy_size >= 16 ; copy_size -= 16) {
+
+	if (copy_size < 0)
+		copy_size = 0;
+	old_size = copy_size;
+
+	for (; copy_size >= 16 ; copy_size -= 16) {
 		memcpy(buf, start, 16);
 		start += 16;
+		buf += 16; 
 	}
 
-	if (copy_size > 0)
+	if (copy_size > 0) {
 		memcpy(buf, start, copy_size);
+	}
 
-	return copy_size;
+	/*
+	 * adjust file->curr to right location
+	 */
+	file->curr += old_size;
+	return old_size;
 }
 
 int ramdisk_seek(struct file *file, u32 offset)
@@ -72,9 +86,9 @@ int ramdisk_seek(struct file *file, u32 offset)
 		return -EINVAL;
 
 	if (file->size < offset)
-		file->curr = file->size;
+		file->curr = file->base + file->size;
 	else
-		file->curr = offset;
+		file->curr = file->base + offset;
 
 	return 0;
 }
@@ -88,8 +102,8 @@ struct file *ramdisk_open(char *name)
 	/*
 	 * search file though compare his name
 	 */
-	for(i = 0; i < ramdisk_header->file_count; i++) {
-		if(strcmp(name, temp->name)) {
+	for (i = 0; i < ramdisk_header->file_count; i++) {
+		if(strcmp(name, temp->name) == 0) {
 			file = kmalloc(sizeof(struct file), GFP_KERNEL);
 			if (!file) {
 				return NULL;
@@ -101,8 +115,7 @@ struct file *ramdisk_open(char *name)
 			 */
 			file->base = __ramdisk_start + temp->base;
 			file->size = temp->size;
-			file->curr = 0;
-
+			file->curr = file->base;
 			break;
 		}
 

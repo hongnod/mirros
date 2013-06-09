@@ -94,7 +94,7 @@ struct elf_file *get_elf_info(struct file *file)
 	char *str;
 	struct elf_file *elf_file;
 
-	ret = fs_read(file,(char *)&hdr,sizeof(elf_header),0);
+	ret = fs_read(file,(char *)&hdr,sizeof(elf_header));
 	if(ret < 0){
 		kernel_error("read elf file error at 0x%x offset 0",
 						sizeof(elf_header));
@@ -138,7 +138,7 @@ struct elf_file *get_elf_info(struct file *file)
 		return NULL;
 	}
 	
-	ret = fs_read(file,(char *)header,hdr.e_shnum*hdr.e_shentsize,0);
+	ret = fs_read(file,(char *)header,hdr.e_shnum*hdr.e_shentsize);
 	if(ret < 0){
 		elf_file = NULL;
 		goto go_out;
@@ -150,7 +150,7 @@ struct elf_file *get_elf_info(struct file *file)
 		goto go_out;
 	}
 
-	ret = fs_read(file,str,4096,0);
+	ret = fs_read(file,str,4096);
 	if(ret < 0){
 		elf_file = NULL;
 		goto go_out;
