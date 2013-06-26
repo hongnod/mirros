@@ -45,7 +45,6 @@ exit:
 	return __ramdisk_start;
 }
 
-
 int ramdisk_read(struct file *file, char *buf, int size)
 {
 	int copy_size = size;

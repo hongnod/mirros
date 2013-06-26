@@ -136,7 +136,7 @@ int strncmp(const char *src,const char *dst,int n)
 {
 	int ret = 0;
 
-	while(!(ret = *(unsigned char *)src - *(unsigned char *)dst) && n){
+	while (n && (!(ret = *(unsigned char *)src - *(unsigned char *)dst))) {
 		++src, ++dst;
 		n--;
 	}

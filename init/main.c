@@ -22,6 +22,7 @@ extern int timer_tick_init(void);
 extern int build_idle_task(void);
 extern int arch_init_exception_stack(void);
 extern int init_task();
+extern unsigned long mount_ramdisk(void);
 
 int main(void)
 {
@@ -55,6 +56,7 @@ int main(void)
 	 *now we can enable irq
 	 */
 	enable_irqs();
+	mount_ramdisk();
 
 	init_task();
 
