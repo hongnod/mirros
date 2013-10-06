@@ -86,7 +86,7 @@ int build_tlb_table_entry(unsigned long vstart,
 		attr = get_tlb_attr(flag);
 
 		for (i = 0; i < (size >> 20); i++) {
-			value = build_tlb_des(ps,attr);
+			value = build_tlb_des(ps, attr);
 			*(unsigned long *)tlb_base = value;
 
 			/*
@@ -122,8 +122,8 @@ int build_page_table_entry(unsigned long base,
 	u32 attr;
 	unsigned long pa = va_to_pa(vstart);
 
-	if (!is_aligin(size,SIZE_4K) || size > SIZE_1M) {
-		kernel_debug("build page_table_entry: size not aligin");
+	if (!is_aligin(size, SIZE_4K) || size > SIZE_1M) {
+		kernel_error("build page_table_entry: size not aligin");
 		return -EINVAL;
 	}
 

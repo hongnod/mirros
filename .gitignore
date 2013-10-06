@@ -6,6 +6,6 @@ tags
 .gitignore
 boot.elf
 boot.bin
-tools/pc.log
+tools/skyeye/pc.log
 out/
 tools/genramdisk/genramdisk

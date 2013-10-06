@@ -23,6 +23,8 @@ int printk_thread(void *arg)
 
 int init_task(void)
 {
+	kernel_exec("test");
+	while (1);
 	kthread_run("printk1", printk_thread, (void *)1);
 	kthread_run("printk2", printk_thread, (void *)2);
 	kthread_run("printk3", printk_thread, (void *)3);

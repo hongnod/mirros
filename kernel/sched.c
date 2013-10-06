@@ -156,7 +156,7 @@ void set_task_state(struct task_struct *task, state_t state)
 	state_t new = state;
 	state_change_t change = STATE_NONE_TO_NONE;
 
-	kernel_info("task state old %d new %d\n", old, new);
+	kernel_info("task %s state old %d new %d\n", task->name, old, new);
 	change = get_state_change(old, new);
 	kernel_info("change is %d \n", change);
 	if (change == STATE_NONE_TO_NONE) {

@@ -186,6 +186,7 @@ static int alloc_page_table(struct task_struct *new)
 			goto error;
 		}
 		page = va_to_page((unsigned long)addr);
+		page->free_base += (SIZE_4K - sizeof(u32));
 		list_add_tail(&tmp->stack_list, &page->pgt_list);
 	}
 	tmp->stack_curr = list_next(&tmp->stack_list);
@@ -218,8 +219,9 @@ static int task_map_memory(void *addr, struct task_struct *task, int flag)
 	struct mm_struct *ms = &task->mm_struct;
 	struct list_head *list;
 	struct page *page;
+	int flag_new = flag & PROCESS_MAP_MASK;
 
-	switch (flag & PROCESS_MAP_MASK) {
+	switch (flag_new) {
 		case PROCESS_MAP_STACK:
 			list = ms->stack_curr;
 			break;
@@ -254,8 +256,12 @@ repeat:
 	build_page_table_entry((unsigned long)page->free_base,
 			       (unsigned long)addr, PAGE_SIZE, 0);
 
-	page->free_base = page->free_base + sizeof(unsigned long);
-	page->free_size = page->free_size - sizeof(unsigned long);
+	if (flag_new == PROCESS_MAP_ELF)
+		page->free_base += sizeof(unsigned long);
+	else
+		page->free_base -= sizeof(unsigned long);
+
+	page->free_size -= sizeof(unsigned long);
 
 	return 0;
 }
@@ -441,6 +447,9 @@ int switch_task(struct task_struct *cur,
 	unsigned long pa;
 	struct page *page;
 
+	unsigned long val;
+	unsigned long *addr;
+
 	if (!cur || !next)
 		return -EINVAL;
 
@@ -457,8 +466,9 @@ int switch_task(struct task_struct *cur,
 	 * load the page table for stack, because stack
 	 * is grow downward, sub 4m for one page.
 	 */
+	kernel_debug("switch task next is %s\n", next->name);
 	head = &next->mm_struct.stack_list;
-	list_for_each(head, list) {
+	list_for_each (head, list) {
 		page = list_entry(list, struct page, pgt_list);
 		pa = page_to_pa(page);
 		build_tlb_table_entry(stack_base - SIZE_NM(4), pa,
@@ -470,7 +480,7 @@ int switch_task(struct task_struct *cur,
 	 * load elf image memory page table
 	 */
 	head = &next->mm_struct.elf_list;
-	list_for_each(head, list) {
+	list_for_each (head, list) {
 		page = list_entry(list, struct page, pgt_list);
 		pa = page_to_pa(page);
 		build_tlb_table_entry(task_base, pa, SIZE_NM(4), TLB_ATTR_USER_MEMORY);
@@ -675,6 +685,7 @@ int load_elf_section(struct elf_section *section,
 		if (strncmp(section->name, ".bss", 4)) {
 			kernel_debug("load image: %s 0x%x %d\n",
 				     section->name, base_addr, i);
+			fs_seek(file, section->offset);
 			i = fs_read(file, base_addr, SIZE_4K - j);
 			if (i < 0)
 				return -EIO;
