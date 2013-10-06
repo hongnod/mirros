@@ -48,20 +48,21 @@ int main(void)
 	sched_init();
 	timer_tick_init();
 
-	if(build_idle_task()){
+	if (build_idle_task()) {
 		panic("can not build kernel task\n");
 	}
 
 	/*
 	 *now we can enable irq
 	 */
+
 	enable_irqs();
 	mount_ramdisk();
 
 	init_task();
 
 	for (;;) {
-		printk("In Idle State\n");
+		kernel_debug("In Idle State\n");
 		sched();
 	}
 

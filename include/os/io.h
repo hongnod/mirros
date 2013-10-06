@@ -56,17 +56,17 @@ static inline u32 inl(unsigned long addr)
 	return readl((volatile u32 *)addr);
 }
 
-static inline void outb(u8 b,unsigned long addr)
+static inline void outb(u8 b, unsigned long addr)
 {
 	writeb(b,(volatile u8 *)addr);
 }
 
-static inline void outw(u16 w,unsigned long addr)
+static inline void outw(u16 w, unsigned long addr)
 {
 	writew(w,(volatile u16 *)addr);
 }
 
-static inline void outl(u32 l,unsigned long addr)
+static inline void outl(u32 l, unsigned long addr)
 {
 	writel(l,(volatile u32 *)addr);
 }
@@ -75,66 +75,66 @@ static inline void outl(u32 l,unsigned long addr)
  *read or write on data to a fix addr,usually used to read data 
  *from fifo
  */
-static inline void insb(unsigned long addr,void *buffer,int count)
+static inline void insb(unsigned long addr, void *buffer, int count)
 {
-	if(count){
+	if (count) {
 		u8 *buf = buffer;
-		do{
+		do {
 			u8 x = inb(addr);
 			*buf++ = x;
-		}while(--count);
+		} while (--count);
 	}
 }
 
-static inline void insw(unsigned long addr,void *buffer,int count)
+static inline void insw(unsigned long addr, void *buffer, int count)
 {
-	if(count){
+	if (count) {
 		u16 *buf = buffer;
-		do{
+		do {
 			u16 x = inw(addr);
 			*buf++ = x;
-		}while(--count);
+		} while (--count);
 	}
 }
 
-static inline void insl(unsigned long addr,void *buffer,int count)
+static inline void insl(unsigned long addr, void *buffer, int count)
 {
-	if(count){
+	if (count) {
 		u32 *buf = buffer;
-		do{
+		do {
 			u32 x = inl(addr);
 			*buf++ = x;
-		}while(--count);
+		} while (--count);
 	}
 }
 
-static inline void outsb(unsigned long addr,const void *buffer,int count)
+static inline void outsb(unsigned long addr, const void *buffer, int count)
 {
-	if(count){
+	if (count) {
 		const u8 *buf = buffer;
-		do{
+		do {
 			outb(*buf++,addr);
-		}while(--count);
+		} while (--count);
 	}
 }
 
-static inline void outsw(unsigned long addr,const void *buffer,int count)
+static inline void outsw(unsigned long addr, const void *buffer, int count)
 {
-	if(count){
+	if (count) {
 		const u16 *buf = buffer;
-		do{
+		do {
 			outw(*buf++,addr);
-		}while(--count);
+		} while (--count);
 	}
 }
 
-static inline void outsl(unsigned long addr,const void *buffer,int count)
+static inline void outsl(unsigned long addr, const void *buffer, int count)
 {
-	if(count){
+	if (count) {
 		const u32 *buf = buffer;
-		do{
+		do {
 			outl(*buf++,addr);
-		}while(--count);
+		} while (--count);
 	}
 }
 
@@ -142,17 +142,17 @@ static inline void outsl(unsigned long addr,const void *buffer,int count)
 #define ioread16(addr)			readw(addr)
 #define ioread32(addr)			readl(addr)
 
-#define iowrite8(v,addr)		writeb((v),(addr))
-#define iowrite16(v,addr)		writew((v),(addr))
-#define iowrite32(v,addr)		writel((v),(addr))
+#define iowrite8(v, addr)		writeb((v),(addr))
+#define iowrite16(v, addr)		writew((v),(addr))
+#define iowrite32(v, addr)		writel((v),(addr))
 
-#define ioread8_rep(p,dst,count)	insb((unsigned long)(p),(dst),(count))
-#define ioread16_rep(p,dst,count)	insw((unsigned long)(p),(dst),(count))
-#define ioread32_rep(p,dst,count)	insl((unsigned long)(p),(dst),(count))
+#define ioread8_rep(p, dst, count)	insb((unsigned long)(p), (dst), (count))
+#define ioread16_rep(p, dst, count)	insw((unsigned long)(p), (dst), (count))
+#define ioread32_rep(p, dst, count)	insl((unsigned long)(p), (dst), (count))
 
-#define iowrite8_rep(p,src,count)	outsb((unsigned long)(p),(src),(count))
-#define iowrite16_rep(p,src,count)	outsw((unsigned long)(p),(src),(count))
-#define iowrite32_rep(p,src,count)	outsl((unsigned long)(p),(src),(count))
+#define iowrite8_rep(p, src, count)	outsb((unsigned long)(p), (src), (count))
+#define iowrite16_rep(p, src, count)	outsw((unsigned long)(p), (src), (count))
+#define iowrite32_rep(p, src, count)	outsl((unsigned long)(p), (src), (count))
 
 void *request_io_mem(unsigned long addr);
 

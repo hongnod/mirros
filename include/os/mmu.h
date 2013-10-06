@@ -16,12 +16,13 @@
 #define TLB_ATTR_USER_MEMORY		0x00000008
 #define TLB_ATTR_MEMORY_MASK		0x0000000f
 
-int build_tlb_table_entry(unsigned long vstart,unsigned long pstart,
-			size_t size,u32 flag);
+int build_tlb_table_entry(unsigned long vstart,
+			  unsigned long pstart,
+			  size_t size, u32 flag);
 
 int build_page_table_entry(unsigned long base,
 			   unsigned long vstart,
-			   size_t size,u32 flag);
-void clear_tlb_entry(unsigned long va,size_t size);
+			   size_t size, u32 flag);
+void clear_tlb_entry(unsigned long va, size_t size);
 
 #endif

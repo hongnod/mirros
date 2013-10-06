@@ -13,7 +13,7 @@ typedef unsigned int	elf_off;
 
 #define EI_NIDENT	16
 
-typedef struct _elf_header{
+typedef struct _elf_header {
 	char		e_ident[EI_NIDENT];
 	elf_half	e_type;
 	elf_half	e_machine;
@@ -28,7 +28,7 @@ typedef struct _elf_header{
 	elf_half	e_shentsize;				/*size of section header*/
 	elf_half	e_shnum;				/*how many section header in this obj file*/
 	elf_half	e_shstrndx;				/*index point to the string header in the file*/
-}elf_header;
+} elf_header;
 
 #define PF_R		0X04
 #define PF_W		0X02
@@ -59,7 +59,7 @@ typedef struct _elf_header{
 #define SHF_EXECINSTR	0x4
 #define SHF_MASKPROC	0xf0000000
 
-typedef struct _program_header{
+typedef struct _program_header {
 	elf_word	p_type;
 	elf_off		p_offset;
 	elf_addr	p_vaddr;
@@ -68,9 +68,9 @@ typedef struct _program_header{
 	elf_word	p_memz;
 	elf_word	p_flags;
 	elf_word	p_align;
-}elf_program_header;
+} elf_program_header;
 
-typedef struct _section_header{
+typedef struct _section_header {
 	elf_word	sh_name;			/*index of the section which can find the section's name'*/
 	elf_word	sh_type;			/*type of the section*/
 	elf_word	sh_flags;
@@ -81,7 +81,7 @@ typedef struct _section_header{
 	elf_word	sh_info;
 	elf_word	sh_addralign;
 	elf_word	sh_entsize;
-}elf_section_header;
+} elf_section_header;
 
 /* special section indexes */
 #define SHN_UNDEF	0
@@ -121,15 +121,15 @@ typedef struct _section_header{
 #define EV_CURRENT	1
 #define EV_NUM		2
 
-typedef enum _section_id{
+typedef enum _section_id {
 	SECTION_TEXT,
 	SECTION_DATA,
 	SECTION_BSS,
 	SECTION_MAX
-}section_id;
+} section_id;
 
 struct elf_section;
-struct elf_section{
+struct elf_section {
 	char name[32];		/*section id,text data or bss*/
 	u32 offset;		/*section offset in the elf file*/
 	u32 size;		/*section size*/
@@ -137,7 +137,7 @@ struct elf_section{
 	struct elf_section *next;
 };
 
-struct elf_file{
+struct elf_file {
 	u32 alloc_size;
 	struct elf_section *head;
 };

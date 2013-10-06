@@ -36,11 +36,11 @@ int register_irq(int nr,int (*fn)(void *arg),void *arg)
 	int err = 0;
 	unsigned long flags;
 
-	if( (nr > IRQ_NR-1) || (fn == NULL) )
+	if ((nr > IRQ_NR-1) || (fn == NULL))
 		return -EINVAL;
 
 	enter_critical(&flags);
-	err = arch_register_irq(nr,fn,arg);
+	err = arch_register_irq(nr, fn, arg);
 	exit_critical(&flags);
 
 	return err;

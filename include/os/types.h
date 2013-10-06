@@ -32,7 +32,7 @@ typedef unsigned long 		stack_t;
 #define NULL ((void *)0)
 
 #define container_of(ptr,name,member) \
-	(name *)((unsigned char *)ptr-((unsigned char *)&(((name *)0)->member)))
+	(name *)((unsigned char *)ptr - ((unsigned char *)&(((name *)0)->member)))
 
 #define bit(nr) (1 << nr)
 

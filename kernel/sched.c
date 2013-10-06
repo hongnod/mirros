@@ -8,14 +8,15 @@
 #include <os/mm.h>
 #include <os/printk.h>
 #include <asm/asm_interrupt.h>
+#include <os/task.h>
 
-struct sched_list{
+struct sched_list {
 	struct list_head list;
 	u32 count;
 };
 
 #define PID_MAP_PAGE_NR			1
-struct pid_map{
+struct pid_map {
 	int nr_free;
 	int current;
 	int nr;
@@ -25,15 +26,15 @@ struct pid_map{
 struct pid_map pid_map;
 
 /*
- *used to find the running task, if the task with the related prio
- *is in TASK_STATE_RUNNING count means how many running task is in 
- *this prio
+ * used to find the running task, if the task with
+ * the related prio is in PROCESS_STATE_RUNNING
+ * count means how many running task is in this prio
  */
 static struct sched_list os_sched_table[MAX_PRIO];
 
 /*
- *represent the current running task
- *and task will be schedule at now
+ * represent the current running task
+ * and task will be schedule at now
  */
 struct task_struct *current;
 struct task_struct *idle;
@@ -46,32 +47,32 @@ int in_interrupt = 0;
 	static struct sched_list task_##name
 
 #define init_sched_list(name)		\
-	do{						\
+	do {						\
 		init_list(&task_##name.list);		\
 		task_##name.count = 0;			\
-	}while(0)
+	} while(0)
 
 
-#define sched_list_add_task(name,task)		\
-	do{					\
-		list_add(&task_##name.list,&task->name);  \
+#define sched_list_add_task(name, task)		\
+	do {					\
+		list_add(&task_##name.list, &task->name);  \
 		task_##name.count++;		\
-	}while(0)
+	} while(0)
 
 #define sched_list_add_task_tail(name,task)		\
-	do{					\
-		list_add_tail(&task_##name.list,&task->name);  \
+	do {					\
+		list_add_tail(&task_##name.list, &task->name);  \
 		task_##name.count++;		\
-	}while(0)
+	} while(0)
 
 #define sched_list_del_task(name,task)	\
-	do{						\
+	do {						\
 		list_del(&task->name);	\
 		task_##name.count--;		\
-	}while(0)
+	} while(0)
 
-#define sched_list_for_each(head,list)	\
-	list_for_each((&task_##head.list),list)
+#define sched_list_for_each(head, list)	\
+	list_for_each((&task_##head.list), list)
 
 /*
  *used to trace the all task in the system with
@@ -83,13 +84,15 @@ DECLARE_SCHED_LIST(sleep);
 
 static void inline prio_list_add_task(struct task_struct *task)
 {
-	list_add(&os_sched_table[task->prio].list,&task->prio_running);
+	list_add(&os_sched_table[task->prio].list,
+		 &task->prio_running);
 	os_sched_table[task->prio].count++;
 }
 
 static void prio_list_add_task_tail(struct task_struct *task)
 {
-	list_add_tail(&os_sched_table[task->prio].list,&task->prio_running);
+	list_add_tail(&os_sched_table[task->prio].list,
+		      &task->prio_running);
 	os_sched_table[task->prio].count++;
 }
 
@@ -99,9 +102,116 @@ static void inline prio_list_del_task(struct task_struct *task)
 	os_sched_table[task->prio].count--;
 }
 
-void inline set_task_state(struct task_struct *task,state_t state)
+typedef enum _state_change_t {
+	STATE_NONE_TO_PREPARE,
+	STATE_NONE_TO_SLEEP,
+	STATE_PREPARE_TO_RUNNING,
+	STATE_PREPARE_TO_SLEEP,
+	STATE_PREPARE_TO_IDLE,
+	STATE_RUNNING_TO_SLEEP,
+	STATE_RUNNING_TO_PREPARE,
+	STATE_RUNNING_TO_IDLE,
+	STATE_SLEEP_TO_PREPARE,
+	STATE_SLEEP_TO_IDLE,
+	STATE_SLEEP_TO_RUNNING,
+	STATE_NONE_TO_NONE,
+} state_change_t;
+
+/*
+ * old, new, value
+ */
+#define CHANGE_TABLE_SIZE	(13 * 3)
+static char change_table[CHANGE_TABLE_SIZE] = {
+	PROCESS_STATE_UNKNOWN, PROCESS_STATE_PREPARE, STATE_NONE_TO_PREPARE,
+	PROCESS_STATE_UNKNOWN, PROCESS_STATE_SLEEP, STATE_NONE_TO_SLEEP,
+	PROCESS_STATE_PREPARE, PROCESS_STATE_RUNNING, STATE_PREPARE_TO_RUNNING,
+	PROCESS_STATE_PREPARE, PROCESS_STATE_SLEEP, STATE_PREPARE_TO_SLEEP,
+	PROCESS_STATE_PREPARE, PROCESS_STATE_IDLE, STATE_PREPARE_TO_IDLE,
+	PROCESS_STATE_RUNNING, PROCESS_STATE_SLEEP, STATE_RUNNING_TO_SLEEP,
+	PROCESS_STATE_RUNNING, PROCESS_STATE_PREPARE, STATE_RUNNING_TO_PREPARE,
+	PROCESS_STATE_RUNNING, PROCESS_STATE_IDLE, STATE_RUNNING_TO_IDLE,
+	PROCESS_STATE_SLEEP, PROCESS_STATE_PREPARE, STATE_SLEEP_TO_PREPARE,
+	PROCESS_STATE_SLEEP, PROCESS_STATE_IDLE, STATE_SLEEP_TO_IDLE,
+	PROCESS_STATE_SLEEP, PROCESS_STATE_RUNNING, STATE_SLEEP_TO_RUNNING,
+};
+
+static state_change_t get_state_change(state_t old, state_t new)
 {
-	task->state = state;
+	int i = 0;
+
+	for (i = 0; i < CHANGE_TABLE_SIZE ; i += 3) {
+		if ((old == change_table[i]) && 
+		    (new == change_table[i + 1])) {
+			return change_table[i + 2];
+		}
+	}
+
+	return STATE_NONE_TO_NONE;
+}
+
+void set_task_state(struct task_struct *task, state_t state)
+{
+	unsigned long flags;
+	state_t old = get_task_state(task);
+	state_t new = state;
+	state_change_t change = STATE_NONE_TO_NONE;
+
+	kernel_info("task state old %d new %d\n", old, new);
+	change = get_state_change(old, new);
+	kernel_info("change is %d \n", change);
+	if (change == STATE_NONE_TO_NONE) {
+		return;
+	}
+
+	enter_critical(&flags);
+
+	task->state = new;
+	switch (change) {
+		case STATE_NONE_TO_PREPARE:
+			sched_list_add_task_tail(system, task);
+			prio_list_add_task_tail(task);
+			break;
+		case STATE_NONE_TO_SLEEP:
+			sched_list_add_task_tail(system, task);
+			sched_list_add_task(sleep, task);
+			break;
+		case STATE_PREPARE_TO_RUNNING:
+			prio_list_del_task(task);
+			break;
+		case STATE_PREPARE_TO_IDLE:
+			prio_list_del_task(task);
+			sched_list_add_task_tail(idle, task);
+			break;
+		case STATE_PREPARE_TO_SLEEP:
+			prio_list_del_task(task);
+			sched_list_add_task_tail(sleep, task);
+			break;
+		case STATE_RUNNING_TO_SLEEP:
+			sched_list_add_task_tail(sleep, task);
+			break;
+		case STATE_RUNNING_TO_PREPARE:
+			prio_list_add_task_tail(task);
+			break;
+		case STATE_RUNNING_TO_IDLE:
+			sched_list_add_task_tail(idle, task);
+			break;
+		case STATE_SLEEP_TO_PREPARE:
+			sched_list_del_task(sleep, task);
+			prio_list_add_task_tail(task);
+			break;
+		case STATE_SLEEP_TO_IDLE:
+			sched_list_del_task(sleep, task);
+			sched_list_add_task_tail(idle, task);
+			break;
+		case STATE_SLEEP_TO_RUNNING:
+			sched_list_del_task(sleep, task);
+			break;
+		default:
+			break;
+
+	}
+
+	exit_critical(&flags);
 }
 
 state_t inline get_task_state(struct task_struct *task)
@@ -117,15 +227,15 @@ static int inline sched_table_empty(int i)
 static int init_pid_allocater(void)
 {
 	init_mutex(&pid_map.pid_map_mutex);
-	pid_map.nr = (PID_MAP_PAGE_NR*PAGE_SIZE)/sizeof(void *);
+	pid_map.nr = (PID_MAP_PAGE_NR * PAGE_SIZE) / sizeof(void *);
 	pid_map.nr_free = pid_map.nr;
 	pid_map.current = 0;
 	pid_map.addr = get_free_page(GFP_KERNEL);
-	if(pid_map.addr == NULL){
+	if (pid_map.addr == NULL) {
 		return -ENOMEM;
 	}
 
-	memset((char *)pid_map.addr,0,PID_MAP_PAGE_NR*PAGE_SIZE);
+	memset((char *)pid_map.addr, 0, PID_MAP_PAGE_NR * PAGE_SIZE);
 
 	return 0;	
 }
@@ -138,11 +248,11 @@ static void get_task_run_time(struct task_struct *task)
 int init_sched_struct(struct task_struct *task)
 {
 
-	if( (task->parent) && (task->parent != idle)){
+	if ((task->parent) && (task->parent != idle)) {
 		task->prio = task->parent->prio;
 		task->pre_prio = task->parent->pre_prio;
 	}
-	else if ( (task->parent) && (task->parent == idle) ){
+	else if ((task->parent) && (task->parent == idle)) {
 		/*kernel thread*/
 		task->prio = KERNEL_THREAD_PRIO;
 		task->pre_prio = KERNEL_THREAD_PRIO;
@@ -163,6 +273,8 @@ int init_sched_struct(struct task_struct *task)
 	task->wait_time = -1;
 	task->time_out = 0;
 	task->run_count = 0;
+	task->state = PROCESS_STATE_UNKNOWN;
+	task->exit_state = PROCESS_STATE_UNKNOWN;
 	
 	init_list(&task->prio_running);
 	init_list(&task->system);
@@ -181,11 +293,11 @@ pid_t get_new_pid(struct task_struct *task)
 
 	mutex_lock(&map->pid_map_mutex);
 
-	if(map->nr_free == 0)
+	if (map->nr_free == 0)
 		goto out;
 
-	for(i = map->current; i < map->nr; i++){
-		if(base[i] == 0){
+	for (i = map->current; i < map->nr; i++) {
+		if (base[i] == 0) {
 			map->nr_free--;
 			map->current++;
 			base[i] = (u32)task;
@@ -194,7 +306,7 @@ pid_t get_new_pid(struct task_struct *task)
 			return i;
 		}
 
-		if(i == map->nr-1){
+		if (i == map->nr-1) {
 			i = 0;
 		}
 	}
@@ -205,25 +317,16 @@ out:
 	return 0;
 }
 
-int add_new_task(struct task_struct *task)
+struct task_struct *pid_get_task(pid_t pid)
 {
-	unsigned long flags;
+	u32 *addr;
 	
-	if(!task)
-		return 1;
+	if (pid < pid_map.nr) {
+		addr = pid_map.addr;
+		return (struct task_struct *)(addr + pid);
+	}
 
-	/*
-	 * when add new task to system, we need disable irqs
-	 * first.
-	 */
-	enter_critical(&flags);
-
-	sched_list_add_task(system,task);
-	prio_list_add_task_tail(task);
-
-	exit_critical(&flags);
-
-	return 0;
+	return NULL;
 }
 
 static struct task_struct *find_next_run_task(void)
@@ -233,12 +336,16 @@ static struct task_struct *find_next_run_task(void)
 	struct task_struct *task;
 
 	/*
-	 *idle process is always on preparing state
+	 * idle process is always on preparing state
 	 */
-	for(i=0; i < MAX_PRIO - 1; i++){
-		if(os_sched_table[i].count){
+	for (i = 0; i < MAX_PRIO - 1; i++) {
+		if (os_sched_table[i].count) {
 			break;
 		}
+	}
+	
+	if ((MAX_PRIO - 1) == i) {
+		return current;
 	}
 
 	task_head = &os_sched_table[i].list;
@@ -253,23 +360,21 @@ static int prepare_to_switch(struct task_struct *next)
 {
 	state_t state = get_task_state(current);
 
+	if (current == next) {
+		next = current;
+		goto re_run;
+	}
+
 	/*
 	 * frist we check that whether the state of the task
 	 * has been set to a correct state.if no we will take
 	 * next actions, we add current task to the tail of 
 	 * the list.
 	 */
-	if (state == TASK_STATE_RUNNING) {
-		set_task_state(current,TASK_STATE_PREPARE);
-		prio_list_add_task_tail(current);
-		get_task_run_time(current);
+	if (state == PROCESS_STATE_RUNNING) {
+		set_task_state(current, PROCESS_STATE_PREPARE);
 	}
-	else if (state == TASK_STATE_SLEEP) {
-		/*
-		 *this task is suspended by himself
-		 */
-		sched_list_add_task(sleep, current);
-	}
+
 	/*
 	 * notic:the running task must be choose from the prio
 	 * list and can not be select from sleep list directly.
@@ -284,13 +389,14 @@ static int prepare_to_switch(struct task_struct *next)
 		next->time_out = 1;
 
 	next->wait_time = -1;
+	set_task_state(next, PROCESS_STATE_RUNNING);
 
+re_run:
 	/*
-	 *delete from prepare list and ready to run.
+	 * delete from prepare list and ready to run.
 	 */
 	next->run_count++;
-	prio_list_del_task(next);
-	set_task_state(next,TASK_STATE_RUNNING);
+	get_task_run_time(next);
 
 	return 0;
 }
@@ -299,11 +405,12 @@ void sched(void)
 {
 	unsigned long flags; 
 
-	if(in_interrupt){
+	if (in_interrupt) {
 		kernel_debug("Do not call sched in interrupt\n");
 		return;
 	}
-	if(!schedule_running){
+
+	if (!schedule_running) {
 		kernel_debug("Schedule has not benn init\n");
 		return;
 	}
@@ -311,10 +418,6 @@ void sched(void)
 	enter_critical(&flags);
 
 	next_run = find_next_run_task();
-	if(next_run == current){
-		goto re_run;
-	}
-
 	prepare_to_switch(next_run);
 
 	/*
@@ -325,7 +428,6 @@ void sched(void)
 	 */
 	arch_switch_task_sw();
 
-re_run:
 	exit_critical(&flags);
 }
 
@@ -339,8 +441,8 @@ int os_tick_handler(void *arg)
 	 * for his time to run again,the sub his wait_time,otherwise 
 	 * means that the task needed other action to resume him
 	 */
-	sched_list_for_each(sleep,list) {
-		task = list_entry(list,struct task_struct,sleep);
+	sched_list_for_each(sleep, list) {
+		task = list_entry(list, struct task_struct, sleep);
 		if (task->wait_time > 0) {
 			task->wait_time--;
 		}
@@ -349,9 +451,7 @@ int os_tick_handler(void *arg)
 		 * task has timeout and need to wake up
 		 */
 		if (task->wait_time == 0) {
-			sched_list_del_task(sleep, task);
-			set_task_state(task, TASK_STATE_PREPARE);
-			prio_list_add_task_tail(task);
+			set_task_state(task, PROCESS_STATE_PREPARE);
 		}
 	}
 
@@ -365,21 +465,9 @@ int os_tick_handler(void *arg)
 	if (current->run_time == 0) {
 
 		next_run = find_next_run_task();
-
-		if (next_run == current) {
-			get_task_run_time(current);
-		}
-		else {
-			prepare_to_switch(next_run);
-		}
+		prepare_to_switch(next_run);
 	}
 
-	return 0;
-}
-
-int switch_task(struct task_struct *cur,
-		struct task_struct *next)
-{
 	return 0;
 }
 
@@ -399,8 +487,8 @@ int suspend_task_timeout(struct task_struct *task, int timeout)
 	 * then return;
 	 */
 	state = get_task_state(task);
-	if (state == TASK_STATE_RUNNING) {
-		set_task_state(task, TASK_STATE_SLEEP);
+	if (state == PROCESS_STATE_RUNNING) {
+		set_task_state(task, PROCESS_STATE_SLEEP);
 	}
 	else {
 		/*
@@ -428,15 +516,13 @@ int wakeup_task(struct task_struct *task)
 {
 	unsigned long flags;
 
-	if (get_task_state(task) != TASK_STATE_SLEEP)
+	if (get_task_state(task) != PROCESS_STATE_SLEEP)
 		return -EINVAL;
 
 	enter_critical(&flags);
 
-	sched_list_del_task(sleep, task);
-	set_task_state(task, TASK_STATE_PREPARE);
-	prio_list_add_task_tail(task);
 	get_task_run_time(task);
+	set_task_state(task, PROCESS_STATE_PREPARE);
 
 	exit_critical(&flags);
 
@@ -447,9 +533,7 @@ int sched_init(void)
 {
 	int i;
 
-	kernel_debug("**** init schedule ****\n");
-
-	for(i=0;i<MAX_PRIO;i++){
+	for (i = 0; i< MAX_PRIO; i++){
 		init_list(&os_sched_table[i].list);
 		os_sched_table[i].count = 0;
 	}

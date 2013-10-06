@@ -13,13 +13,13 @@ static struct file_header *file_header = NULL;
 
 unsigned long mount_ramdisk(void)
 {
-	if (!__ramdisk_start){
+	if (!__ramdisk_start) {
 		kernel_error("Can not mount ramdisk for system\n");
 		goto exit;
 	}
 
 	/*
-	 *get ramdisk header to check wether it is a correct ramdisk image
+	 * get ramdisk header to check wether it is a correct ramdisk image
 	 */
 	ramdisk_header = (struct ramdisk_header *)__ramdisk_start;
 	if (strcmp(ramdisk_header->name, "ramdisk")) {
@@ -37,7 +37,7 @@ unsigned long mount_ramdisk(void)
 			ramdisk_header->file_count);
 	
 	/*
-	 *get the address of file table.
+	 * get the address of file table.
 	 */
 	file_header = (struct file_header *)(__ramdisk_start + sizeof(struct ramdisk_header));
 
@@ -54,7 +54,7 @@ int ramdisk_read(struct file *file, char *buf, int size)
 	if (!file)
 		return 0;
 
-	if ( (unsigned long)(start + size) > (file->base + file->size)) {
+	if ((unsigned long)(start + size) > (file->base + file->size)) {
 		copy_size = (unsigned char *)(file->base + file->size) - start;
 	}
 

@@ -26,6 +26,12 @@ arch_switch_task_sw:
 	str r0, [sp, #56]	@spsr
 	str lr, [sp, #60]	@lr
 
+	ldr r2, =current	@change page table.
+	ldr r3, =next_run
+	ldr r0, [r2]
+	ldr r1, [r3]
+	bl switch_task
+
 	ldr r0, =current
 	ldr r1, =next_run
 
@@ -56,10 +62,6 @@ arch_switch_task_sw:
 	add sp, sp, #12		@lr
 	
 	ldmfd sp!, {pc}
-
-.global arch_switch_task_hw
-arch_switch_task_hw:
-	mov pc, lr
 
 /* r0 = &current
  * r1 = &next_run

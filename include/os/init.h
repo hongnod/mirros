@@ -13,13 +13,13 @@
 
 typedef int (*init_call)(void);
 
-struct cmdline{
+struct cmdline {
 	unsigned long tag;
 	unsigned long head;
 	char arg[256];
 };
 
-struct platform_info{
+struct platform_info {
 	unsigned long machine;
 	char arch[ARCH_NAME_SIZE];
 	char board_name[BOARD_NAME_SIZE];

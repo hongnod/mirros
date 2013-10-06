@@ -14,25 +14,25 @@
 
 extern void __puts(char *buf);
 
-int numbric(char *buf,unsigned int num,int flag)
+int numbric(char *buf,unsigned int num, int flag)
 {
 	int len = 0;
 
-	switch(flag & PRINTF_MASK){
+	switch (flag & PRINTF_MASK) {
 		case PRINTF_DEC:
-			if(flag &PRINTF_SIGNED)
-				len = itoa(buf,(int)num);
+			if (flag &PRINTF_SIGNED)
+				len = itoa(buf, (int)num);
 			else
-				len = uitoa(buf,num);
+				len = uitoa(buf, num);
 			break;
 		case PRINTF_HEX:
-			len = hextoa(buf,num);
+			len = hextoa(buf, num);
 			break;
 		case PRINTF_OCT:
-			len = octtoa(buf,num);
+			len = octtoa(buf, num);
 			break;
 		case PRINTF_BIN:
-			len = bintoa(buf,num);
+			len = bintoa(buf, num);
 			break;
 		default:
 			break;
@@ -46,7 +46,7 @@ int numbric(char *buf,unsigned int num,int flag)
  *this will cause an overfolow error,we will fix
  *this bug later
  */
-int vsprintf(char *buf,const char *fmt,va_list arg)
+int vsprintf(char *buf, const char *fmt, va_list arg)
 {
 	char *str;
 	int len;
@@ -55,40 +55,40 @@ int vsprintf(char *buf,const char *fmt,va_list arg)
 	u32 unumber;
 	int flag = 0;
 
-	if(buf == NULL)
+	if (buf == NULL)
 		return -1;
 
-	for(str=buf;*fmt;fmt++){
+	for (str = buf; *fmt; fmt++) {
 
-		if(*fmt != '%'){
+		if (*fmt != '%') {
 			*str++ = *fmt;
 			continue;
 		}
 		
 		fmt++;
-		switch(*fmt){
+		switch (*fmt) {
 			case 'd':
-				flag |= PRINTF_DEC|PRINTF_SIGNED;				
+				flag |= PRINTF_DEC | PRINTF_SIGNED;
 				break;
 			case 'x':
-				flag |= PRINTF_HEX|PRINTF_UNSIGNED;
+				flag |= PRINTF_HEX | PRINTF_UNSIGNED;
 				break;
 			case 'u':
-				flag |= PRINTF_DEC|PRINTF_UNSIGNED;
+				flag |= PRINTF_DEC | PRINTF_UNSIGNED;
 				break;
 			case 's':
-				len = strlen(tmp=va_arg(arg,char *));
-				strncpy(str,tmp,len);
+				len = strlen(tmp = va_arg(arg, char *));
+				strncpy(str, tmp, len);
 				str += len;
 				continue;
 				break;
 			case 'c':
-				*str = (char)(va_arg(arg,char));
+				*str = (char)(va_arg(arg, char));
 				str++;
 				continue;
 				break;
 			case 'o':
-				flag |= PRINTF_DEC|PRINTF_SIGNED;
+				flag |= PRINTF_DEC | PRINTF_SIGNED;
 				break;
 			case '%':
 				*str = '%';
@@ -104,13 +104,13 @@ int vsprintf(char *buf,const char *fmt,va_list arg)
 		}
 
 		if(flag & PRINTF_UNSIGNED){
-			unumber = va_arg(arg,u32);
-			len = numbric(str,unumber,flag);
+			unumber = va_arg(arg, u32);
+			len = numbric(str, unumber, flag);
 		}
 		else{
 
-			number = va_arg(arg,s32);
-			len = numbric(str,number,flag);
+			number = va_arg(arg, s32);
+			len = numbric(str, number, flag);
 		}
 		str+=len;
 		flag = 0;
@@ -133,7 +133,7 @@ int printk(const char *fmt,...)
 	char printf_buf[1024];
 	
 	va_start(arg,fmt);
-	printed = vsprintf(printf_buf,fmt,arg);
+	printed = vsprintf(printf_buf, fmt, arg);
 	va_end(arg);
 
 	puts(printf_buf);
@@ -150,15 +150,15 @@ int level_printk(const char *fmt,...)
 	char printf_buf[1024];
 	ch = *fmt;
 
-	if(is_digit(ch)){
+	if (is_digit(ch)) {
 		ch = ch-'0';
 		if(ch > level)
 			return 0;
 		fmt++;
 	}
 	
-	va_start(arg,fmt);
-	printed = vsprintf(printf_buf,fmt,arg);
+	va_start(arg, fmt);
+	printed = vsprintf(printf_buf, fmt, arg);
 	va_end(arg);
 
 	puts(printf_buf);

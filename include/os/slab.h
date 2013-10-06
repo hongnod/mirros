@@ -1,8 +1,8 @@
 #ifndef _SLAB_H
 #define _SLAB_H
 
-void *kmalloc(int size,unsigned long flag);
+void *kmalloc(int size, unsigned long flag);
 void kfree(void *addr);
-void *kzalloc(int size,unsigned long flag);
+void *kzalloc(int size, unsigned long flag);
 
 #endif

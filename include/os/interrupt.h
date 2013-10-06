@@ -3,7 +3,7 @@
 
 #include <asm/config.h>
 
-struct irq_des{
+struct irq_des {
 	int (*fn)(void *arg);
 	void *arg;
 };
@@ -16,6 +16,6 @@ void disable_irqs(void);
 void enable_irqs(void);
 void enter_critical(unsigned long *val);
 void exit_critical(unsigned long *val);
-int register_irq(int nr,int (*fn)(void *arg),void *arg);
+int register_irq(int nr, int (*fn)(void *arg), void *arg);
 
 #endif

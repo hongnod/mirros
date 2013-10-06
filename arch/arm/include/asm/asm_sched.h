@@ -5,7 +5,7 @@
 
 struct task_struct;
 
-typedef struct _pt_regs{
+typedef struct _pt_regs {
 	u32 r0;
 	u32 r1;
 	u32 r2;
@@ -19,19 +19,18 @@ typedef struct _pt_regs{
 	u32 r10;
 	u32 r11;
 	u32 r12;
-	u32 sp;
+	u32 sp_user;
 	u32 lr;
 	u32 lr_prev;
 	u32 pc;
 	u32 cpsr;
 	u32 spsr;
-}pt_regs;
+} pt_regs;
 
 void arch_switch_task_sw(void);
 void arch_switch_task_hw(void);
-void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg);
-int arch_set_up_process(pt_regs *regs,struct task_struct *task);
-
+void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg);
+int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs);
 
 int arch_set_task_return_value(pt_regs *reg,
 		struct task_struct *task);

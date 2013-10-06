@@ -57,8 +57,7 @@ void mutex_unlock(struct mutex *m)
 	 * set m->count to 0, and wake up all the task
 	 * which wait for this mutex.
 	 */
-
-	if (!m->count){
+	if (!m->count) {
 		kernel_error("mutex has not been locked\n");
 		return;
 	}
@@ -73,7 +72,7 @@ void mutex_unlock(struct mutex *m)
 	 * state agin quickly since the first wake up task will obtain
 	 * the mutex.
 	 */
-	list_for_each((&m->wait), list) {
+	list_for_each ((&m->wait), list) {
 		task = list_entry(list,struct task_struct, wait);
 		list_del(&task->wait);
 		wakeup_task(task);

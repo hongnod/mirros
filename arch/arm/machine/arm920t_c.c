@@ -13,6 +13,7 @@
 #include <os/io.h>
 #include <asm/asm_sched.h>
 #include <os/sched.h>
+#include <os/panic.h>
 
 /*
  *code for libgcc.a
@@ -32,15 +33,17 @@ unsigned long arch_get_tlb_base(void)
 	return KERNEL_BASE_ADDRESS;	
 }
 
-u32 arch_build_tlb_des(unsigned long pa,u32 attr)
+u32 arch_build_tlb_des(unsigned long pa, u32 attr)
 {
 	u32 ret_val;
 
 	/*
 	 *note if you use if(attr & 0x03 == 0x01) there is syntax error
 	 *you need add a (attr & 0x03), remember it.
+	 * 0x01 means 1level page table
+	 * 0x02 means 2level page table
 	 */
-	if( (attr & 0x03) == 0X01)
+	if ((attr & 0x03) == 0X01)
 		ret_val = (pa & 0xfffffc00) | attr;
 	else
 		ret_val = (pa & 0xfff00000) | attr;
@@ -48,7 +51,7 @@ u32 arch_build_tlb_des(unsigned long pa,u32 attr)
 	return ret_val;
 }
 
-u32 arch_build_page_table_des(unsigned long pa,u32 attr)
+u32 arch_build_page_table_des(unsigned long pa, u32 attr)
 {
 	return ((pa & 0xfffff000) | attr);
 }
@@ -57,7 +60,7 @@ u32 arch_get_tlb_attr(u32 flag)
 {
 	u32 attr = 0;
 
-	switch(flag & TLB_ATTR_MEMORY_MASK){
+	switch (flag & TLB_ATTR_MEMORY_MASK) {
 		case TLB_ATTR_KERNEL_MEMORY:
 			attr |= MST_WB_AP_SRW_UN;
 			break;
@@ -179,7 +182,7 @@ inline struct irq_des *arch_get_irq_description(int nr)
 	return ((struct irq_des*)irq_table_base) + nr;
 }
 
-int arch_register_irq(int nr,int (*fn)(void *arg),void *arg)
+int arch_register_irq(int nr, int (*fn)(void *arg), void *arg)
 {
 	/*
 	 *register irq has ensure that fn != null and nr is 
@@ -187,7 +190,7 @@ int arch_register_irq(int nr,int (*fn)(void *arg),void *arg)
 	 */
 	struct irq_des *des = arch_get_irq_description(nr);
 
-	if( (des) && (des->fn == NULL) ){
+	if ((des) && (des->fn == NULL)) {
 		des->fn = fn;
 		des->arg = arg;
 		platform_enable_irq(nr);
@@ -200,17 +203,17 @@ int arch_register_irq(int nr,int (*fn)(void *arg),void *arg)
 
 int arch_irq_init(void)
 {
-	int irq_table_size = IRQ_NR*sizeof(struct irq_des);
+	int irq_table_size = IRQ_NR * sizeof(struct irq_des);
 	int nr;
 
 	nr = page_nr(irq_table_size);
-	irq_table_base = get_free_pages(nr,GFP_KERNEL);
+	irq_table_base = get_free_pages(nr, GFP_KERNEL);
 	if(irq_table_base == NULL){
 		kernel_error("can not allocate size for irq_table\n");
 		return -ENOMEM;
 	}
 
-	memset(irq_table_base,0,nr<<PAGE_SHIFT);
+	memset(irq_table_base, 0, nr<<PAGE_SHIFT);
 
 	platform_irq_init();
 
@@ -229,8 +232,8 @@ int trap_init(void)
 	 * need map 0xfff00000 to the page section address which
 	 * we get.
 	 */
-	vector_page = get_free_page_aligin(0xffff0000,GFP_KERNEL);
-	kernel_debug("vector address is 0x%x\n",(u32)vector_page);
+	vector_page = get_free_page_aligin(0xffff0000, GFP_KERNEL);
+	kernel_debug("vector address is 0x%x\n", (u32)vector_page);
 	if(vector_page == NULL){
 		kernel_error("faild get page for trap\n");
 		return -ENOMEM;
@@ -242,11 +245,13 @@ int trap_init(void)
 	 * value of bit13 of cp register c1 to indicate that we need remap
 	 * the vector.
 	 */
-	memcpy(vector_page,(void *)_vector_start,_vector_end - _vector_start);
+	memcpy(vector_page, (void *)_vector_start, _vector_end - _vector_start);
 	kernel_debug("physic address of vector is 0x%x\n",
 			(u32)va_to_pa((unsigned long)vector_page));
-	build_tlb_table_entry(0xfff00000,va_to_pa((unsigned long)vector_page)&0xfff00000,
-			SIZE_1M,TLB_ATTR_KERNEL_MEMORY);	
+	build_tlb_table_entry(0xfff00000,
+			      va_to_pa((unsigned long)vector_page) & 0xfff00000,
+			      SIZE_1M,
+			      TLB_ATTR_KERNEL_MEMORY);
 
 	arch_remap_vector();
 
@@ -257,10 +262,40 @@ int trap_init(void)
  * when run a kernel thread, we need this function to 
  * init the values of each registers.
  */
-void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
+void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg)
 {
-	regs->r0 = (u32)arg;
-	regs->r1 = 1;
+	/*
+	 * if fn != NULL, this means a kernel thread, other
+	 * wise it is called by exec(), fill correct value
+	 * to each register. kernel_stack will store at
+	 * the first member of tash_struct, so we fill it to
+	 * 0
+	 */
+	if (fn) {
+		regs->r0 = (u32)arg;
+		regs->r1 = 1;
+		regs->sp_user = 0;
+		regs->lr = (u32)fn;
+		regs->cpsr = SVC_MODE;
+	} else {
+		/*
+		 * calculate how many arguments passed to this
+		 * program.
+		 */
+		char **tmp = (char **)arg;
+		int n = 0;
+		while (*tmp) {
+			n ++;
+			tmp ++;
+		}
+		regs->r0 = n;
+		regs->r1 = PROCESS_USER_BASE;
+		regs->sp_user = PROCESS_USER_STACK_BASE;
+		regs->lr = PROCESS_USER_EXEC_BASE;
+		regs->pc = 0;
+		regs->cpsr = USER_MODE;
+	}
+
 	regs->r2 = 2;
 	regs->r3 = 3;
 	regs->r4 = 4;
@@ -274,13 +309,10 @@ void arch_init_pt_regs(pt_regs *regs,void *fn,void *arg)
 	regs->r12 = 12;
 	regs->spsr = 0;
 	regs->lr_prev = 0;
-	regs->sp = 0;
-	regs->lr = (u32)fn;
 	regs->pc = 0;
-	regs->cpsr = SVC_MODE;
 }
 
-int arch_set_up_process(pt_regs *regs,struct task_struct *task)
+int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs)
 {
 	u32 *stack_base;
 
@@ -288,10 +320,11 @@ int arch_set_up_process(pt_regs *regs,struct task_struct *task)
 	 * in arm, stack is grow from up to down,so we 
 	 * adjust it;
 	 */
-	if(task->stack_base == NULL){
+	if (task->stack_base == NULL) {
 		kernel_error("task kernel stack invailed\n");
-		return -EFATAL;
+		return -EFAULT;
 	}
+	task->stack_base = task->stack_origin;
 	task->stack_base += KERNEL_STACK_SIZE;
 	stack_base = task->stack_base;
 	
@@ -300,7 +333,7 @@ int arch_set_up_process(pt_regs *regs,struct task_struct *task)
 	 * note:this sp is in user space,if the process is a 
 	 * kernel task, this value will no effect.
 	 */
-	*(--stack_base) = regs->sp;	
+	*(--stack_base) = regs->sp_user;
 	*(--stack_base) = regs->lr_prev;
 	*(--stack_base) = regs->spsr;
 	*(--stack_base) = regs->r12;
@@ -330,7 +363,7 @@ int arch_set_up_process(pt_regs *regs,struct task_struct *task)
 int arch_set_task_return_value(pt_regs *reg,
 		struct task_struct *task)
 {
-	reg->r0 = 0;
+	reg->r0 = task->pid;
 
 	return 0;
 }
@@ -345,7 +378,7 @@ void prefetch_abort_handler(void)
 	panic("prefetch abort\n");
 }
 
-void arch_set_mode_stack(u32 base,u32 mode)
+void arch_set_mode_stack(u32 base, u32 mode)
 {
 	/*
 	 *r0 = base, r1=mode
@@ -365,18 +398,18 @@ int arch_init_exception_stack(void)
 {
 	u32 stack_base;
 
-	stack_base = (u32)get_free_pages(3 * page_nr(MODE_STACK_SIZE),GFP_KERNEL);
+	stack_base = (u32)get_free_pages(3 * page_nr(MODE_STACK_SIZE), GFP_KERNEL);
 	if(stack_base == 0){
 		kernel_error("can not allcate memory for exception mode\n");
 		return -ENOMEM;
 	}
 
 	 stack_base += MODE_STACK_SIZE;
-	 arch_set_mode_stack(stack_base,IRQ_MODE);
+	 arch_set_mode_stack(stack_base, IRQ_MODE);
 	 stack_base += MODE_STACK_SIZE;
-	 arch_set_mode_stack(stack_base,ABORT_MODE);
+	 arch_set_mode_stack(stack_base, ABORT_MODE);
 	 stack_base += MODE_STACK_SIZE;
-	 arch_set_mode_stack(stack_base,UNDEF_MODE);
+	 arch_set_mode_stack(stack_base, UNDEF_MODE);
 
 	 return 0;
 }

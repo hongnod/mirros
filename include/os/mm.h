@@ -16,13 +16,13 @@ struct platform_info;
 #define MM_ZONE_MASK		0x3
 #define UNKNOW_MEM		4
 
-typedef enum __mm_zone_t{
+typedef enum __mm_zone_t {
 	MM_ZONE_NORMAL = NORMAL_MEM,
 	MM_ZONE_DMA = DMA_MEM,
 	MM_ZONE_RES = RES_MEM,
 	MM_ZONE_IO = IO_MEM,
 	MM_ZONE_UNKNOW,
-}mm_zone_t;
+} mm_zone_t;
 
 /*
  *indicate which zone memory needed to be allocted.
@@ -58,7 +58,7 @@ typedef enum __mm_zone_t{
 #define mm_info(fmt, ...)	info("[  mm:  ] ", fmt,##__VA_ARGS__)
 #define mm_error(fmt, ...)	error("[  mm:  ] ", fmt,##__VA_ARGS__)
 
-struct memory_region{
+struct memory_region {
 	unsigned long start;
 	u32 size;
 	int attr;
@@ -71,21 +71,21 @@ struct memory_region{
  * free_size:remain size of this page
  * usage:usage of this page,if 0 page can release.
  */
-struct page{
+struct page {
 	unsigned long phy_address;
 	u32 flag;
 	/*
 	 * if page used as a pgt then use pgt_list
 	 * if page used as slab elment then use slab_list
 	 */
-	union{
+	union {
 		struct list_head plist;
 		struct list_head pgt_list;
 		struct list_head slab_list;
 		struct list_head slab_header_list;
 	};
 
-	union{
+	union {
 		unsigned long free_base;
 		u32 extra_size;
 	};
@@ -96,9 +96,9 @@ struct page{
 	 *then free_size indicate how many free size in this page.
 	 */
 	
-	u32 free_size:16;
-	u32 count:8;
-	u32 usage:8;
+	u32 free_size : 16;
+	u32 count : 8;
+	u32 usage : 8;
 };
 
 #define PAGE_SIZE		4096
@@ -106,8 +106,9 @@ struct page{
 
 #define page_nr(size)		(baligin(size,PAGE_SIZE)>>PAGE_SHIFT)
 
-void register_memory_region(unsigned long start,u32 size,int attr,
-					struct platform_info *info);
+void register_memory_region(unsigned long start,
+			    u32 size,int attr,
+			    struct platform_info *info);
 
 void page_get(struct page *pg);
 
@@ -119,7 +120,7 @@ void  *get_free_pages(int count,unsigned long flag);
 	
 static inline void *get_free_page(unsigned long flag)
 {
-	return get_free_pages(1,flag);
+	return get_free_pages(1, flag);
 }
 
 int page_state(int i);
@@ -135,12 +136,13 @@ unsigned long pa_to_va(unsigned long pa);
 int page_to_page_id(struct page *page);
 u32 mm_free_page(unsigned long flag);
 unsigned long page_to_va(struct page *page);
-void copy_page_va(u32 target,u32 source);
-void copy_page_pa(u32 target,u32 source);
-void copy_page_ua(u32 taget,u32 source);
+void copy_page_va(u32 target, u32 source);
+void copy_page_pa(u32 target, u32 source);
+void copy_page_ua(u32 taget, u32 source);
 struct page *pa_to_page(unsigned long pa);
 unsigned long va_to_pa(unsigned long va);
 unsigned long page_to_va(struct page *page);
-void *get_free_page_aligin(unsigned long aligin,u32 flag);
+unsigned long page_to_pa(struct page *page);
+void *get_free_page_aligin(unsigned long aligin, u32 flag);
 
 #endif
