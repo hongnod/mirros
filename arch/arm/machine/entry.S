@@ -132,10 +132,10 @@ irq:
 	and r1, r1, #MODE_MASK
 
 	cmp r1, #USER_MODE		@ if last mode is user mode
-	beq exit_irq_from_user
+	bleq exit_irq_from_user
 
 	cmp r1, #SVC_MODE		@ if last mode is svc mode
-	beq exit_irq_from_svc
+	bleq exit_irq_from_svc
 
 	ldr r1, [r0, #64]
 	msr spsr, r1
@@ -188,8 +188,7 @@ exit_irq_from_user:		@ r0 is the address of process context
 exit_irq_from_svc:		@r0 is the address of process context
 	set_mode SVC_MODE | NO_INT
 
-	ldr r2, [r0, #60]
-	mov sp, r2
+	add sp, r0, #72
 
 	ldr r2, [r0, #56]
 	mov lr, r2

@@ -276,7 +276,7 @@ void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg)
 		regs->r1 = 1;
 		regs->sp = 13;
 		regs->pc = (u32)fn;
-		regs->cpsr = SVC_MODE | NO_INT;
+		regs->cpsr = SVC_MODE;
 	} else {
 		/*
 		 * calculate how many arguments passed to this

@@ -436,6 +436,7 @@ int os_tick_handler(void *arg)
 	struct list_head *list;
 	struct task_struct *task;
 	
+	kernel_info("enter in os_tick_handler\n");
 	/*
 	 * look up for each task in sleep list,if task is waitting
 	 * for his time to run again,the sub his wait_time,otherwise 
@@ -468,6 +469,7 @@ int os_tick_handler(void *arg)
 		prepare_to_switch(next_run);
 	}
 
+	kernel_info("exit in os_tick_handler\n");
 	return 0;
 }
 

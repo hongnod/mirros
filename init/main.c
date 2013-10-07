@@ -55,11 +55,10 @@ int main(void)
 	/*
 	 *now we can enable irq
 	 */
-
-	enable_irqs();
 	mount_ramdisk();
 
 	init_task();
+	enable_irqs();
 
 	for (;;) {
 		kernel_debug("In Idle State\n");
