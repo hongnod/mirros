@@ -274,9 +274,9 @@ void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg)
 	if (fn) {
 		regs->r0 = (u32)arg;
 		regs->r1 = 1;
-		regs->sp_user = 0;
-		regs->lr = (u32)fn;
-		regs->cpsr = SVC_MODE;
+		regs->sp = 13;
+		regs->pc = (u32)fn;
+		regs->cpsr = SVC_MODE | NO_INT;
 	} else {
 		/*
 		 * calculate how many arguments passed to this
@@ -290,9 +290,8 @@ void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg)
 		}
 		regs->r0 = n;
 		regs->r1 = PROCESS_USER_BASE;
-		regs->sp_user = PROCESS_USER_STACK_BASE;
-		regs->lr = PROCESS_USER_EXEC_BASE;
-		regs->pc = 0;
+		regs->sp = PROCESS_USER_STACK_BASE;
+		regs->pc = PROCESS_USER_EXEC_BASE;
 		regs->cpsr = USER_MODE;
 	}
 
@@ -307,9 +306,8 @@ void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg)
 	regs->r10 = 10;
 	regs->r11 = 11;
 	regs->r12 = 12;
-	regs->spsr = 0;
-	regs->lr_prev = 0;
-	regs->pc = 0;
+	regs->lr = 14;
+	regs->spsr = 15;
 }
 
 int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs)
@@ -328,13 +326,14 @@ int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs)
 	task->stack_base += KERNEL_STACK_SIZE;
 	stack_base = task->stack_base;
 	
-	*(--stack_base) = regs->lr;
 	/*
-	 * note:this sp is in user space,if the process is a 
-	 * kernel task, this value will no effect.
+	 * when switch task, the context will follow
+	 * below stucture.
 	 */
-	*(--stack_base) = regs->sp_user;
-	*(--stack_base) = regs->lr_prev;
+	*(--stack_base) = regs->pc;
+	*(--stack_base) = regs->cpsr;
+	*(--stack_base) = regs->sp;
+	*(--stack_base) = regs->lr;
 	*(--stack_base) = regs->spsr;
 	*(--stack_base) = regs->r12;
 	*(--stack_base) = regs->r11;
@@ -348,12 +347,7 @@ int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs)
 	*(--stack_base) = regs->r3;
 	*(--stack_base) = regs->r2;
 	*(--stack_base) = regs->r1;
-	/*
-	 * for kernel task,r0 is the argument (void *)arg;
-	 * but for user space r0 need to be set to 0;
-	 */
 	*(--stack_base) = regs->r0;
-	*(--stack_base) = regs->cpsr;
 
 	task->stack_base = (void *)stack_base;
 
@@ -413,3 +407,4 @@ int arch_init_exception_stack(void)
 
 	 return 0;
 }
+

@@ -19,9 +19,8 @@ typedef struct _pt_regs {
 	u32 r10;
 	u32 r11;
 	u32 r12;
-	u32 sp_user;
+	u32 sp;
 	u32 lr;
-	u32 lr_prev;
 	u32 pc;
 	u32 cpsr;
 	u32 spsr;

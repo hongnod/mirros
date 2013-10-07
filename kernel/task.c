@@ -447,9 +447,6 @@ int switch_task(struct task_struct *cur,
 	unsigned long pa;
 	struct page *page;
 
-	unsigned long val;
-	unsigned long *addr;
-
 	if (!cur || !next)
 		return -EINVAL;
 

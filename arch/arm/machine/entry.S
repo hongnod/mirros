@@ -81,72 +81,126 @@ not_used:
 	.align 5
 
 irq:
-	sub lr, lr, #4
-	str lr, [sp, #-4]
-	mrs lr, spsr					@store register in irq mode
+	sub lr, lr, #4		@ save the context in irq stack temp.
+	str lr, [sp, #-4]	@ pc
+
+	mrs lr, spsr		@ cpsr
 	str lr, [sp, #-8]
-	str r0, [sp, #-12]
+
+	str r0, [sp, #-12]	@ save r0 r1 r2 r3 r4
 	str r1, [sp, #-16]
+	str r2, [sp, #-20]
+	str r3, [sp, #-24]
+	str r4, [sp, #-28]
 
-	mrs r1, cpsr					@change to system mode to get the stack base of user space and store to r1
+	and r0, lr, #MODE_MASK	@ if enter irq from user mode 
+	cmp r0, #USER_MODE
+	bleq user_to_irq
+
+	cmp r0, #SVC_MODE
+	bleq svc_to_irq		@ if enter irq from svc mode
+	
+	mov r1, sp		@ save sp of irq to r1 and goto svc mode
+	msr cpsr, #SVC_MODE | NO_INT	@ r0= r1= r2=spsr r3=lr r4=sp
+
+	sub sp, sp, #20			@ reserve for pc cpsr spsr lr sp
+	push {r5-r12}			@ save r5-r12
+
+	ldr r5, [r1, #-12]		@ r0
+	ldr r6, [r1, #-16]		@ r1
+	ldr r7, [r1, #-20]		@ r2
+	ldr r8, [r1, #-24]		@ r3
+	ldr r9, [r1, #-28]		@ r4
+	push {r5-r9}			@ save r0-r4
+
+	ldr r5, [r1, #-4]		@ pc
+	str r5, [sp, #68]
+
+	ldr r5, [r1, #-8]		@ cpsr
+	str r5, [sp, #64]
+	
+	str r4, [sp, #60]		@ sp
+	str r3, [sp, #56]		@ lr
+	str r2, [sp, #52]		@ spsr
+
+	bl irq_handler			@ goto irq handler
+
+	set_mode IRQ_MODE | NO_INT
+	bl os_exit_irq			@ r0 = process context base address
+
+	ldr r1, [r0, #64]		@ load cpsr of last mode of the process
+	and r1, r1, #MODE_MASK
+
+	cmp r1, #USER_MODE		@ if last mode is user mode
+	beq exit_irq_from_user
+
+	cmp r1, #SVC_MODE		@ if last mode is svc mode
+	beq exit_irq_from_svc
+
+	ldr r1, [r0, #64]
+	msr spsr, r1
+
+	mov lr, r0			@ save context to lr
+	ldmfd lr!, {r0-r12}		@ restore r0 - r12
+
+	add lr, lr, #16			@ return to process
+	ldmfd lr!, {pc}^
+
+user_to_irq:
+	mrs r1, cpsr		@ goto system mode to save some register
 	msr cpsr, #SYSTEM_MODE | NO_INT
-	mov r0, sp
-	msr cpsr, r1					@change to irq mode and get lr and spsr
-	mov r1, sp					@r0 = user sp, r1 = irq sp;
-	
+
+	mov r2, #0		@ spsr, user mode no spsr, set it to 0
+	mov r3, lr		@ lr in user mode
+	mov r4, sp		@ lr in user mode
+
+	msr cpsr, r1		@return to irq mode
+
+	mov pc, lr
+
+svc_to_irq:
+	mrs r1, cpsr		@ goto svc mode
 	msr cpsr, #SVC_MODE | NO_INT
-	sub sp, sp, #16
-	push {r2-r12}					@store r2-r12
-	ldr r2, [r1, #-12]
-	ldr r3, [r1, #-16]
-	push {r2,r3}					@r0 and r1
-	ldr r2, [r1, #-8]				@cpsr
-	push {r2}
 
-	ldr r2, [r1, #-4]				@lr
-	str r2, [sp, #68]
-	str r0, [sp, #64]				@sp
+	mrs r2, spsr		@ spsr in svc mode
+	mov r3, lr		@ lr in svc mode
+	mov r4, sp		@ sp in svc mode
 
-	mrs r0, spsr
-	str r0, [sp, #56]				@spsr
-	str lr, [sp, #60]				@lr_svc
+	msr cpsr, r1		@ return to irq mode
 
-	set_mode IRQ_MODE | NO_INT
-	bl irq_handler
-	
-	ldr r0, =current				@compare current and next run, 
-							@check whether need switch to another task
-	ldr r1, =next_run
-	ldr r2, [r0]
-	ldr r3, [r1]
+	mov pc, lr
 
-	bl os_exit_irq
-
-	set_mode SVC_MODE | NO_INT			@do not need switch task, restore the process context.
-	mov sp, r0					@backup of sp to r0 then we can use it in irq mode
-	ldr lr, [sp, #60]
-	ldr r1, [sp, #60]
-	msr spsr, r1
-	add sp, sp, #72					@adjust sp to right value which before irq come
-	set_mode IRQ_MODE | NO_INT
-
-	ldr r1, [r0, #64]				@restroe the sp point of the user space
+exit_irq_from_user:		@ r0 is the address of process context
 	set_mode SYSTEM_MODE | NO_INT
-	mov sp, r1				
-	set_mode IRQ_MODE | NO_INT
-
-	ldmfd r0!, {r1}
-	msr spsr, r1
-
-	mov lr, r0
-	ldmfd lr!, {r0-r12}
-
-	add lr, lr, #12					@sp has benn restored,so add 12 to sp
 	
-	ldmfd lr!, {pc}^				@switch to another process or return to the current process
+	ldr r2, [r0, #60]	@ sp
+	mov sp, r2
+
+	ldr r2, [r0, #56]	@ lr
+	mov lr, r2
+
+	set_mode SVC_MODE | NO_INT
+	add sp, r0, #72		@ svc sp for user space to call syscall
+
+	set_mode IRQ_MODE | NO_INT
+	mov pc, lr
+
+exit_irq_from_svc:		@r0 is the address of process context
+	set_mode SVC_MODE | NO_INT
+
+	ldr r2, [r0, #60]
+	mov sp, r2
+
+	ldr r2, [r0, #56]
+	mov lr, r2
+
+	ldr r2, [r0, #52]
+	msr spsr, r2
+
+	set_mode IRQ_MODE | NO_INT
+	mov pc, lr
 
 	.align 5
-
 fiq:
 	sub lr, lr, #4
 	stmfd sp!, {lr}
