@@ -362,9 +362,20 @@ int arch_set_task_return_value(pt_regs *reg,
 	return 0;
 }
 
-void data_abort_handler(void)
+void data_abort_handler(pt_regs *regs)
 {
-	panic("data abort\n");
+	kernel_fatal("panic : data abort fatal error regs address 0x%x\n", (u32)regs);
+	kernel_fatal("cpsr:0x%x spsr:0x%x\n", (regs->cpsr), (regs->spsr));
+	kernel_fatal("r0:0x%x r1:0x%x r2:0x%x r3:0x%x\n",
+		      regs->r0, regs->r1, regs->r2, regs->r3);
+	kernel_fatal("r4:0x%x r5:0x%x r6:0x%x r7:0x%x\n",
+		      regs->r4, regs->r5, regs->r6, regs->r7);
+	kernel_fatal("r8:0x%x r9:0x%x r10:0x%x r11:0x%x\n",
+		      regs->r8, regs->r9, regs->r10, regs->r11);
+	kernel_fatal("r12:0x%x sp:0x%x lr:0x%x pc:0x%x\n",
+		      regs->r12, regs->sp, regs->lr, regs->pc);
+
+	while(1);
 }
 
 void prefetch_abort_handler(void)

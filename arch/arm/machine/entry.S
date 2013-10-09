@@ -70,10 +70,25 @@ prefetch_abort:
 	.align 5
 data_abort:
 	subs lr, lr, #8
-	stmfd sp!, {r0-r12, lr}
-	bl data_abort_handler
-	ldmfd sp!, {r0-r12, pc}^
-	
+	push {lr}
+
+	mrs lr, spsr
+	push {lr}
+
+	sub sp, sp, #12
+	push {r0-r12}
+
+	and r0, lr, #MODE_MASK
+	cmp r0, #SVC_MODE
+	bleq svc_to_irq
+
+	str r4, [sp, #60]
+	str r3, [sp, #56]
+	str r2, [sp, #52]
+
+	mov r0, sp
+	b data_abort_handler
+
 	.align 5
 not_used:
 	mov r0, r0
