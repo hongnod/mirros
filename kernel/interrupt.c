@@ -54,7 +54,7 @@ int do_irq_handler(int nr)
 	in_interrupt = 1;
 
 	des = get_irq_description(nr);
-	if(!des){
+	if (!des) {
 		return -EINVAL;
 	}
 	

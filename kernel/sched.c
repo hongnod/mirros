@@ -156,9 +156,8 @@ void set_task_state(struct task_struct *task, state_t state)
 	state_t new = state;
 	state_change_t change = STATE_NONE_TO_NONE;
 
-	kernel_info("task %s state old %d new %d\n", task->name, old, new);
+	kernel_debug("task %s state old %d new %d\n", task->name, old, new);
 	change = get_state_change(old, new);
-	kernel_info("change is %d \n", change);
 	if (change == STATE_NONE_TO_NONE) {
 		return;
 	}
@@ -436,7 +435,7 @@ int os_tick_handler(void *arg)
 	struct list_head *list;
 	struct task_struct *task;
 	
-	kernel_info("enter in os_tick_handler\n");
+	kernel_debug("enter in os_tick_handler\n");
 	/*
 	 * look up for each task in sleep list,if task is waitting
 	 * for his time to run again,the sub his wait_time,otherwise 
@@ -469,7 +468,7 @@ int os_tick_handler(void *arg)
 		prepare_to_switch(next_run);
 	}
 
-	kernel_info("exit in os_tick_handler\n");
+	kernel_debug("exit in os_tick_handler\n");
 	return 0;
 }
 

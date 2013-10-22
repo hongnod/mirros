@@ -1,4 +1,4 @@
-ENTRY(main)
+ENTRY(__start)
 SECTIONS
 {
 	. = 0x00401000;
@@ -16,5 +16,4 @@ SECTIONS
 	_bss_start = .;
 	.bss : {*(.bss)}
 	_bss_end = .;
-
 }

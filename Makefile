@@ -34,13 +34,16 @@ $(boot_bin) : $(boot_elf)
 $(boot_elf) : $(object) $(LDS)
 	$(LD) $(LDFLAG) -o $(boot_elf) $(object) $(LDPATH)
 
-ramdisk : genramdisk
+ramdisk : genramdisk application
 	@echo "@@@@@@@@@ Generate Ramdisk for mirros @@@@@@@@@@@@"
 	@tools/genramdisk/genramdisk ./ramdisk out/ramdisk.img
 	@echo "@@@@@@@@@         End              @@@@@@@@@@@@"
 
 genramdisk: tools/genramdisk/genramdisk.c tools/genramdisk/ramdisk.h
 	@gcc -o tools/genramdisk/genramdisk tools/genramdisk/genramdisk.c
+
+application:
+	@cd tools/application && ./test.sh
 
 $(object): subsystem
 

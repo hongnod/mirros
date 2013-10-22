@@ -35,37 +35,73 @@ undefined_instruction:
 	
 	.align 5					@when swi interrput,cpu is in svc mode
 software_interrupt:
-	stmfd sp!, {r0-r12,lr}				@push the register to stack
+	push {lr}		@ save pc
+	mrs lr, spsr		@ cpsr
+	push {lr}
 
-	msr cpsr, #SYSTEM_MODE				@change to system mode to get the stack base of user space
+	sub sp, sp, #12		@ save r0-r12
+	push {r0-r12}
+
+	mrs r0, cpsr		@ get user_sp user_lr usr_spsr
+	set_mode SYSTEM_MODE | NO_INT
+	mov r1, sp
+	mov r2, lr
+	msr cpsr, r0
+
+	str r1, [sp, #60]	@ user_sp
+	str r2, [sp, #56]	@ user_lr
+
+	mov r4, sp		@ r4 is the base address of pt_regs
+
+	mrs r1, cpsr
+	bic r1, r1, #0xc0
+	msr cpsr_c, r1		@enable irq
+
+	bl _syscall_handler
+
+	mrs r1, cpsr
+	orr r1, r1, #0xc0
+	msr cpsr_c, r1		@disable irq
+
 	mov r0, sp
-	msr cpsr, #SVC_MODE
 
-	stmfd sp!, {r0}					@store the stack of user space.
+	set_mode SYSTEM_MODE | NO_INT
+	ldr r2, [r0, #60]	@ restore user_sp
+	mov sp, r2
 
-	mrs r0, spsr					@store spsr
-	stmfd sp!, {r0}			
+	ldr r2, [r0, #56]	@ restore user_lr
+	mov lr, r2
+	set_mode SVC_MODE | NO_INT
 
-	ldr r0, =KERNEL_BASE_ADDRESS 
-	add r0, r0, r7, lsl #2
-	ldr r1, [r0]
-	mov lr, pc
+	ldr r1, [sp, #64]
+	msr spsr, r1
 
-	mov pc, r1					@goto syscall handler
+	pop {r0-r12}
 
-	ldmfd sp!, {r0}
-	msr spsr_cf, r0
-
-	add sp, sp, #8
-
-	ldmfd sp!, {r1-r12,pc}^				@return 
+	add sp, sp, #16
+	ldmfd sp!, {pc}^
 
 	.align 5
 prefetch_abort:
 	subs lr, lr, #4
-	stmfd sp!, {r0-r1, lr}
-	bl prefetch_abort_handler
-	ldmfd sp!, {r0-r12,pc}^
+	push {lr}
+
+	mrs lr, spsr
+	push {lr}
+
+	sub sp, sp, #12
+	push {r0-r12}
+
+	and r0, lr, #MODE_MASK
+	cmp r0, #SVC_MODE
+	bleq svc_to_irq
+
+	str r4, [sp, #60]
+	str r3, [sp, #56]
+	str r2, [sp, #52]
+
+	mov r0, sp
+	b data_abort_handler
 
 	.align 5
 data_abort:

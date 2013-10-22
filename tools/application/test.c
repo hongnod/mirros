@@ -1,17 +1,17 @@
-int data = 8;
-int test;
+void delay(int a)
+{
+	while (a--);
+}
 
 int main(int argc, char **argv)
 {
-	int a; 
 	int b;
 
-	a = 10;
-	b = 10;
-	test = 10;
-	data = 9;
+	while (1) {
+		b = debug(1, 2, 3, 4);
+		debug(b, 0, 0, 0);
+		delay(500000);
+	}
 
-	while(1);
-
-	return a + b;
+	return 0;
 }

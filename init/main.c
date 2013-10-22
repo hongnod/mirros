@@ -23,6 +23,7 @@ extern int build_idle_task(void);
 extern int arch_init_exception_stack(void);
 extern int init_task();
 extern unsigned long mount_ramdisk(void);
+extern int syscall_init(void);
 
 int main(void)
 {
@@ -30,6 +31,7 @@ int main(void)
 	 *this function can let us use printk before 
 	 *kernel mmu page table build
 	 */
+	disable_irqs();
 	console_early_init();
 
 	init_platform_info();
@@ -45,6 +47,7 @@ int main(void)
 	trap_init();
 	arch_init_exception_stack();
 	arch_irq_init();
+	syscall_init();
 	sched_init();
 	timer_tick_init();
 

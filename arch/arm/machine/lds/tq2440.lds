@@ -8,6 +8,9 @@ SECTIONS
 		*(.rodata)
 	}
 
+	. = ALIGN(4);
+
+	.data : {*(.data)}
 
 	. = ALIGN(4);
 
@@ -17,34 +20,24 @@ SECTIONS
 	}
 	__platform_end = .;
 
-	.data : {*(.data)}
-
 	__init_call_start = .;
-	.arch_init : {
+	._init : {
 		*(.arch_init)
-	}
-	.platform_init : {
 		*(.platform_init)
 	}
 	__init_call_end = .;
 
+	. = ALIGN(4);
+
+	__syscall_table_start = .;
+	.syscall_table : {
+		*(.__syscall)
+	}
+	__syscall_table_end = .;
+
+	. = ALIGN(4);
 
 	_bss_start = .;
 	.bss : {*(.bss)}
 	_bss_end = .;
-
-
-        /* Stabs debugging sections.    */
-        .stab 0 : { *(.stab) }
-        .stabstr 0 : { *(.stabstr) }
-        .stab.excl 0 : { *(.stab.excl) }
-        .stab.exclstr 0 : { *(.stab.exclstr) }
-        .stab.index 0 : { *(.stab.index) }
-        .stab.indexstr 0 : { *(.stab.indexstr) }
-        .comment 0 : { *(.comment) }
-        .debug_abbrev 0 : { *(.debug_abbrev) }
-        .debug_info 0 : { *(.debug_info) }
-        .debug_line 0 : { *(.debug_line) }
-        .debug_pubnames 0 : { *(.debug_pubnames) }
-        .debug_aranges 0 : { *(.debug_aranges) }
 }
