@@ -366,12 +366,12 @@ static int init_page_table_map(unsigned long kernel_end)
 	struct mm_zone *zone = &bank->zone[MM_ZONE_NORMAL];
 	long pv_offset;
 
-	_page_table = (struct page *)(baligin(kernel_end,sizeof(int)));
+	_page_table = (struct page *)(baligin(kernel_end, sizeof(int)));
 	tmp = (unsigned long)(_page_table + bank->total_page);
-	_page_map = (u32 *)(baligin(tmp,sizeof(u32)));
+	_page_map = (u32 *)(baligin(tmp, sizeof(u32)));
 	tmp = (unsigned long)(_page_map + bits_to_long(bank->total_page));
 
-	memset((char *)_page_map,0,tmp - (unsigned long)_page_map);
+	memset((char *)_page_map, 0, tmp - (unsigned long)_page_map);
 
 	size = tmp - kernel_start;
 	size = baligin(size,PAGE_SIZE);
@@ -540,7 +540,7 @@ int mm_init(void)
 	struct mm_bank *bank = get_memory_bank();
 	unsigned long kernel_end = bss_end;
 
-	mm_info("init memory management\n");
+	mm_info("Init memory management\n");
 
 	/*
 	 * parse the memory region information to the system
@@ -561,6 +561,7 @@ int mm_init(void)
 	 * if dma_section is split then needed be add 1
 	 */
 	bank->total_section = info->region_nr;
+	bank->total_page = (bank->total_size) >> PAGE_SHIFT;
 
 	map_zone_memory(bank);
 
