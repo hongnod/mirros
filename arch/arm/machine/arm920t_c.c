@@ -87,7 +87,7 @@ u32 arch_get_page_table_attr(u32 flag)
 	return PGT_DES_DEFAULT;
 }
 
-static void arch_remap_vector(void)
+static void arm920t_remap_vector(void)
 {
 	asm(
 		"push {r0}\n\t"
@@ -98,7 +98,12 @@ static void arch_remap_vector(void)
 	);
 }
 
-static void invalidate_all_tlb(void)
+static void inline arch_remap_vector(void)
+{
+	arm920t_remap_vector();
+}
+
+static void arm920t_invalidate_all_tlb(void)
 {
 	asm(
 		"push {r0}\n\t"
@@ -110,9 +115,77 @@ static void invalidate_all_tlb(void)
 	);
 }
 
-void arch_flush_mmu_tlb(void)
+static void arm920t_clean_icache(void)
 {
-	invalidate_all_tlb();
+	asm(
+		"push {r0}\n\t"
+		"mov r0,#0\n\t"
+		"mcr p15,0,r0,c7,c5,0\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"pop {r0}\n\t"
+	);
+
+}
+
+static void arm920t_drain_wbuffer(void)
+{
+	asm(
+		"push {r0}\n\t"
+		"mov r0,#0\n\t"
+		"mcr p15,0,r0,c7,c10,4\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"pop {r0}\n\t"
+	);
+}
+
+static void arm920t_invalidata_all_cache(void)
+{
+	asm(
+		"push {r0}\n\t"
+		"mov r0,#0\n\t"
+		"mcr p15,0,r0,c7,c7,0\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"pop {r0}\n\t"
+	);
+}
+
+static void arm920t_invalidata_icache(void)
+{
+	asm(
+		"push {r0}\n\t"
+		"mov r0,#0\n\t"
+		"mcr p15,0,r0,c7,c5,0\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"pop {r0}\n\t"
+	);
+}
+
+static void arm920t_invalidata_dcache(void)
+{
+	asm(
+		"push {r0}\n\t"
+		"mov r0,#0\n\t"
+		"mcr p15,0,r0,c7,c6,0\n\t"
+		"nop\n\t"
+		"nop\n\t"
+		"pop {r0}\n\t"
+	);
+}
+
+void arch_flush_cache(void)
+{
+	arm920t_clean_icache();
+	arm920t_drain_wbuffer();
+	arm920t_invalidata_all_cache();
+}
+
+void inline arch_flush_mmu_tlb(void)
+{
+	arm920t_invalidate_all_tlb();
 }
 
 /*

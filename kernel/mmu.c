@@ -9,11 +9,6 @@
 #include <os/bound.h>
 #include <os/errno.h>
 
-static inline void flush_mmu_tlb(void)
-{
-	arch_flush_mmu_tlb();
-}
-
 static inline unsigned long get_tlb_base(void)
 {
 	return arch_get_tlb_base();

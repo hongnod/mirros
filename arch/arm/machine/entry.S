@@ -174,9 +174,10 @@ irq:
 	str r3, [sp, #56]		@ lr
 	str r2, [sp, #52]		@ spsr
 
+	set_mode IRQ_MODE | NO_INT
+
 	bl irq_handler			@ goto irq handler
 
-	set_mode IRQ_MODE | NO_INT
 	bl os_exit_irq			@ r0 = process context base address
 
 	ldr r1, [r0, #64]		@ load cpsr of last mode of the process

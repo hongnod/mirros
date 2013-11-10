@@ -451,6 +451,13 @@ int switch_task(struct task_struct *cur,
 		return -EINVAL;
 
 	/*
+	 * frist we need flush all cache for the current
+	 * process, this cacue the two bugs which spend
+	 * me two weeks to debug.
+	 */
+	flush_cache();
+
+	/*
 	 * if the task is a kernel task, we do not
 	 * need to load his page table. else if next
 	 * run is a userspace task, we load his page
@@ -463,7 +470,7 @@ int switch_task(struct task_struct *cur,
 	 * load the page table for stack, because stack
 	 * is grow downward, sub 4m for one page.
 	 */
-	kernel_debug("switch task next is %s\n", next->name);
+	kernel_fatal("switch task next is %s\n", next->name);
 	head = &next->mm_struct.stack_list;
 	list_for_each (head, list) {
 		page = list_entry(list, struct page, pgt_list);

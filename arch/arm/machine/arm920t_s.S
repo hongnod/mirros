@@ -117,10 +117,6 @@ os_exit_irq:			@ check wether need to swtich task
 	ldr r1, = next_run
 	ldr r2, [r0]
 
-	set_mode SVC_MODE | NO_INT
-	str sp, [r2]		@ save the sp to current process
-	set_mode IRQ_MODE | NO_INT
-
 	ldr r3, [r1]		@ current = next_run
 	str r3, [r0]
 

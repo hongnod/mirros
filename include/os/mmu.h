@@ -16,6 +16,16 @@
 #define TLB_ATTR_USER_MEMORY		0x00000008
 #define TLB_ATTR_MEMORY_MASK		0x0000000f
 
+static inline void flush_mmu_tlb(void)
+{
+	arch_flush_mmu_tlb();
+}
+
+static inline void flush_cache(void)
+{
+	arch_flush_cache();
+}
+
 int build_tlb_table_entry(unsigned long vstart,
 			  unsigned long pstart,
 			  size_t size, u32 flag);
