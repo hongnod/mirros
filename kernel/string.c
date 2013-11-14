@@ -149,6 +149,7 @@ int strncmp(const char *src, const char *dst, int n)
 	return (ret);
 }
 
+#if 0
 int memcpy(void *target, void *source, int size)
 {
 	char *t = (char *)target;
@@ -163,6 +164,7 @@ int memcpy(void *target, void *source, int size)
 
 	return old_size;
 }
+#endif
 
 void memset(char *base, char ch, int size)
 {

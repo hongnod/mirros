@@ -14,4 +14,8 @@ static struct syscall __syscall_##name __attribute__((section(".__syscall"))) = 
 	.addr = syscall_addr	\
 }
 
+#define SYSCALL_BASE	0
+#define SYSCALL_FORK_NR		(SYSCALL_BASE + 1)
+#define SYSCALL_EXEC_NR		(SYSCALL_BASE + 2)
+
 #endif

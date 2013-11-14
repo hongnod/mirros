@@ -13,27 +13,32 @@
 #include <os/fs.h>
 #include <os/mm.h>
 #include <os/task.h>
+#include <os/syscall.h>
 
 #define MAX_ARGV	16
 #define MAX_ENVP	16
 static char *init_argv[MAX_ARGV + 1] = {NULL};
 static char *init_envp[MAX_ENVP + 1] = {NULL};
 
-static int init_mm_struct(struct task_struct *task)
+static int init_mm_struct(struct task_struct *task, u32 user_sp)
 {
 	struct mm_struct *mm = &task->mm_struct;
+	struct mm_struct *mmp;
 	
 	/*
-	 * init mm_struct
+	 * init mm_struct, kernel task do not need this
 	 */
-	mm->elf_size = 0;
-	mm->stack_size = 0;
-	mm->stack_curr = NULL;
-	mm->elf_curr = NULL;
-	init_list(&mm->stack_list);
-	init_list(&mm->elf_list);
-	init_list(&mm->elf_stack_list);
-	init_list(&mm->elf_image_list);
+	if (task->flag & PROCESS_TYPE_USER) {
+		mmp = &task->parent->mm_struct;
+		mm->elf_size = mmp->elf_size;
+		mm->stack_size = PROCESS_USER_STACK_BASE - user_sp;
+		mm->stack_curr = NULL;
+		mm->elf_curr = NULL;
+		init_list(&mm->stack_list);
+		init_list(&mm->elf_list);
+		init_list(&mm->elf_stack_list);
+		init_list(&mm->elf_image_list);
+	}
 	
 	return 0;
 }
@@ -75,13 +80,6 @@ static pid_t init_task_struct(struct task_struct *task, u32 flag)
 	mutex_lock(&parent->mutex);
 	list_add(&parent->child, &task->p);
 	mutex_unlock(&parent->mutex);
-	
-	/*
-	 * before init mm_struct and sched_struct.
-	 * the parent process must be ensure.
-	 */
-	init_mm_struct(task);
-	init_sched_struct(task);
 	
 	return task->pid;
 }
@@ -150,36 +148,22 @@ static int release_task_memory(struct task_struct *task)
 static int alloc_page_table(struct task_struct *new)
 {
 	struct mm_struct *tmp = &new->mm_struct;
-	struct task_struct *old = new->parent;
-	int i;
+	int i, s, e;
 	void *addr;
 	struct page *page;
+
+	s = (PROCESS_STACK_SIZE + SIZE_1M - 1) >> 20;
+	e = (PROCESS_IMAGE_SIZE + SIZE_1M - 1) >> 20;
 
 	/*
 	 * at first,only allocate 16k stack(need 4k pagetable
 	 * for future) and ro data bss,section. now the max
 	 * size for elf image is 1M, so we also need 4k page
-	 * table for elf image.
+	 * table for elf image. allocate page table for user
+	 * stack, one page can map 1M memory. first stack and
+	 * elf we only need one page for each.
 	 */
-	if (old->mm_struct.elf_size)
-		tmp->elf_size = old->mm_struct.elf_size;
-	else
-		tmp->elf_size = SIZE_4K * 256;
-
-	if (old->mm_struct.stack_size)
-		tmp->stack_size = old->mm_struct.stack_size;
-	else
-		tmp->stack_size = SIZE_4K * 4;
-
-	kernel_debug("allocate page table elf 0x%x stack 0x%x\n",
-		     tmp->elf_size, tmp->stack_size);
-
-	/*
-	 * allocate page table for user stack, one page can
-	 * map 1M memory. fro stack and elf we only need one
-	 * page for each.
-	 */
-	for (i=0; i < tmp->stack_size; i += PAGE_MAP_SIZE) {
+	for (i=0; i < s ; i++) {
 		addr = get_free_page(GFP_PGT);
 		kernel_debug("allcoate statck page_table 0x%x\n", (u32)addr);
 		if (addr == NULL) {
@@ -194,7 +178,7 @@ static int alloc_page_table(struct task_struct *new)
 	/*
 	 * allocate page table for elf file memory
 	 */
-	for (i=0; i < tmp->elf_size; i += PAGE_MAP_SIZE) {
+	for (i=0; i < e; i ++) {
 		addr = get_free_page(GFP_PGT);
 		kernel_debug("allcoate elf page_table 0x%x\n", (u32)addr);
 		if (addr == NULL) {
@@ -269,20 +253,22 @@ repeat:
 static int alloc_memory_and_map(struct task_struct *task)
 {
 	struct mm_struct *ms = &task->mm_struct;
-	int i;
+	int i, s, e;
 	void *addr;
 	struct page *page;
+
+	s = page_nr(PROCESS_STACK_SIZE);
+	e = page_nr(PROCESS_IMAGE_SIZE);
 
 	/*
 	 * if there are no enough memory for task
 	 */
-	if (mm_free_page(MM_ZONE_NORMAL) <
-	    page_nr(ms->stack_size + ms->elf_size)) {
+	if (mm_free_page(MM_ZONE_NORMAL) < (s + e)) {
 		kernel_error("bug: no enough memory\n");
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < ms->stack_size; i += PAGE_SIZE) {
+	for (i = 0; i < s; i++) {
 		addr = get_free_page(GFP_KERNEL);
 		if (addr == NULL)
 			goto out;
@@ -292,7 +278,7 @@ static int alloc_memory_and_map(struct task_struct *task)
 		list_add_tail(&ms->elf_stack_list, &page->plist);
 	}
 
-	for (i = 0; i < ms->elf_size; i += PAGE_SIZE) {
+	for (i = 0; i < e; i ++) {
 		addr = get_free_page(GFP_KERNEL);
 		if (addr == NULL)
 			goto out;
@@ -364,55 +350,48 @@ static int copy_process_memory(struct task_struct *old,struct task_struct *new)
 {
 	struct mm_struct *old_mm = &old->mm_struct;
 	struct mm_struct *new_mm = &new->mm_struct;
-	int i = 0;
-	struct list_head *list_old = &old_mm->stack_list;
-	struct list_head *list_new = &new_mm->stack_list;
+	int i = 0, s, e;
+	struct list_head *list_old = &old_mm->elf_stack_list;
+	struct list_head *list_new = &new_mm->elf_stack_list;
 	struct page *page_old;
 	struct page *page_new;
-	u32 *old_base; u32 *new_base;
+	u32 old_base; u32 new_base;
 
-	if ((old_mm->elf_size != new_mm->elf_size) ||
-	    (old_mm->stack_size != new_mm->stack_size)) {
-		kernel_error("different size with father process\n");
-		return -EFAULT;
+	/*
+	 * one page for argv, so need to be included in elf_size
+	 * frist need to flush cache to phsyic memory
+	 */
+	s = page_nr(new_mm->stack_size);
+	e = page_nr(new_mm->elf_size + PAGE_SIZE);
+
+	flush_cache();
+
+	/*
+	 * copy stack
+	 */
+	for (i = 0; i < s; i ++) {
+		list_old = list_next(list_old);
+		list_new = list_next(list_new);
+		page_old = list_entry(list_old, struct page, pgt_list);
+		page_new = list_entry(list_new, struct page, pgt_list);
+		old_base = (u32)page_to_va(page_old);
+		new_base = (u32)page_to_va(page_new);
+		copy_page_va(new_base, old_base);
 	}
 
 	/*
-	 *copy stack
+	 * copy elf memory to new task
 	 */
-	for (i = 0; i < old_mm->stack_size; i++){
-		if(i % (PAGE_SIZE/sizeof(u32)) == 0){
-			list_old = list_next(list_old);
-			list_new = list_next(list_new);
-			page_old = list_entry(list_old, struct page,pgt_list);
-			page_new = list_entry(list_new, struct page,pgt_list);
-			old_base = (u32 *)page_to_va(page_old);
-			new_base = (u32 *)page_to_va(page_new);
-		}
-		copy_page_pa(*new_base, *old_base);
-
-		old_base++;
-		new_base++;
-	}
-
-	/*
-	 *copy elf memory to new task
-	 */
-	list_old = &old_mm->elf_list;
-	list_new = &new_mm->elf_list;
-	for (i = 0; i < old_mm->elf_size; i++) {
-		if (i % (PAGE_SIZE/sizeof(u32)) == 0) {
-			list_old = list_next(list_old);
-			list_new = list_next(list_new);
-			page_old = list_entry(list_old, struct page,pgt_list);
-			page_new = list_entry(list_new, struct page,pgt_list);
-			old_base = (u32 *)page_to_va(page_old);
-			new_base = (u32 *)page_to_va(page_new);
-		}
-		copy_page_pa(*new_base, *old_base);
-
-		old_base++;
-		new_base++;	
+	list_old = &old_mm->elf_image_list;
+	list_new = &new_mm->elf_image_list;
+	for (i = 0; i < e; i++) {
+		list_old = list_next(list_old);
+		list_new = list_next(list_new);
+		page_old = list_entry(list_old, struct page, pgt_list);
+		page_new = list_entry(list_new, struct page, pgt_list);
+		old_base = (u32)page_to_va(page_old);
+		new_base = (u32)page_to_va(page_new);
+		copy_page_va(new_base, old_base);
 	}
 
 	return 0;
@@ -422,7 +401,8 @@ static int copy_process(struct task_struct *new)
 {
 	struct task_struct *old = new->parent;
 
-	copy_process_memory(old, new);
+	if (old)
+		copy_process_memory(old, new);
 
 	return 0;
 }
@@ -470,7 +450,7 @@ int switch_task(struct task_struct *cur,
 	 * load the page table for stack, because stack
 	 * is grow downward, sub 4m for one page.
 	 */
-	kernel_fatal("switch task next is %s\n", next->name);
+	kernel_debug("switch task next is %s\n", next->name);
 	head = &next->mm_struct.stack_list;
 	list_for_each (head, list) {
 		page = list_entry(list, struct page, pgt_list);
@@ -539,7 +519,7 @@ static int inline set_task_return_value(pt_regs *reg,
 	return arch_set_task_return_value(reg, task);
 }
 
-struct task_struct *fork_new_task(char *name, u32 flag)
+struct task_struct *fork_new_task(char *name, u32 user_sp, u32 flag)
 {
 	pid_t pid;
 	struct task_struct *new;
@@ -556,6 +536,13 @@ struct task_struct *fork_new_task(char *name, u32 flag)
 		kernel_error("invaild pid \n");
 		goto exit;
 	}
+
+	/*
+	 * before init mm_struct and sched_struct.
+	 * the parent process must be ensure.
+	 */
+	init_mm_struct(new, user_sp);
+	init_sched_struct(new);
 
 	if (name)
 		strncpy(new->name, name, 15);
@@ -578,14 +565,14 @@ exit:
 	return new;
 }
 
-static pid_t do_fork(char *name, pt_regs *regs, u32 sp, u32 flag)
+static pid_t do_fork(char *name, pt_regs *regs, u32 user_sp, u32 flag)
 {
 	struct task_struct *new;
 
 	/*
 	 * get a new task_struct instance
 	 */
-	new = fork_new_task(name, flag);
+	new = fork_new_task(name, user_sp, flag);
 	if (!new) {
 		kernel_error("fork new task failed\n");
 		return -ENOMEM;
@@ -599,11 +586,13 @@ static pid_t do_fork(char *name, pt_regs *regs, u32 sp, u32 flag)
 	if (flag & PROCESS_TYPE_USER)
 		copy_process(new);
 
-	set_task_return_value(regs, new);
+	if (flag & PROCESS_FLAG_FORK)
+		set_task_return_value(regs, new);
+
 	set_up_task_stack(new, regs);
 	set_task_state(new, PROCESS_STATE_PREPARE);
 
-	return new->pid;
+	return 0;
 }
 
 static void inline init_pt_regs(pt_regs *regs, void *fn, void *arg)
@@ -682,6 +671,7 @@ int load_elf_section(struct elf_section *section,
 	 */
 	k = section->size;
 	i = 0;
+	mm->elf_size += k;
 	do {
 		page = list_entry(list, struct page, plist);
 		base_addr = (char *)page->free_base;
@@ -747,7 +737,7 @@ int do_exec(char *name,
 		 * becase kernel process has not allocat page
 		 * table and mm_struct.
 		 */
-		new = fork_new_task(name, PROCESS_TYPE_USER);
+		new = fork_new_task(name, PROCESS_USER_STACK_BASE, PROCESS_TYPE_USER);
 		if (!new) {
 			kernel_debug("can not fork new process when exec\n");
 			return -ENOMEM;
@@ -805,6 +795,24 @@ int kernel_exec(char *filename)
 	return do_exec(filename, init_argv, init_envp, &regs);
 }
 
+pid_t sys_fork(pt_regs *regs)
+{
+	u32 flag = 0;
+
+	flag |= PROCESS_TYPE_USER | PROCESS_FLAG_FORK;
+
+	return do_fork(NULL, regs, regs->sp, flag);
+}
+DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, sys_fork);
+
+/*
+pid_t sys_exec(pt_regs *regs)
+{
+	return do_exec()
+}
+DEFINE_SYSCALL(exec, SYSCALL_EXEC_NR, sys_exec)
+*/
+
 int build_idle_task(void)
 {
 	idle = kmalloc(sizeof(struct task_struct), GFP_KERNEL);
@@ -824,7 +832,6 @@ int build_idle_task(void)
 	idle->parent = NULL;
 	init_list(&idle->child);
 	init_list(&idle->p);
-	init_mm_struct(idle);
 
 	init_mutex(&idle->mutex);
 	init_sched_struct(idle);

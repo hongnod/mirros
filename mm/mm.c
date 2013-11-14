@@ -945,18 +945,12 @@ out:
 	return NULL;
 }
 
-#define page_align(addr)		(!(addr & (PAGE_SIZE-1)))
-void copy_page_va(u32 target, u32 source)
+void inline copy_page_va(u32 target, u32 source)
 {
-	if(!page_align(target) || !page_align(source)){
-		kernel_error("bug:address is not page aligin\n");
-		return;
-	}
-
 	memcpy((char *)target, (char *)source, PAGE_SIZE);
 }
 
-void copy_page_pa(u32 target,u32 source)
+void inline copy_page_pa(u32 target,u32 source)
 {
 	copy_page_va(pa_to_va(target), pa_to_va(source));
 }

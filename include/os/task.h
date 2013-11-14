@@ -8,11 +8,15 @@
 #include <asm/config.h>
 
 #define KERNEL_STACK_SIZE	ARCH_KERNEL_STACK_SIZE
+#define PROCESS_STACK_SIZE	(4 * PAGE_SIZE)
+#define PROCESS_IMAGE_SIZE	(256 * PAGE_SIZE)
 
 #define PROCESS_NAME_SIZE	16
 
 #define PROCESS_TYPE_KERNEL	0x00000001
 #define PROCESS_TYPE_USER	0x00000002
+
+#define PROCESS_FLAG_FORK	0x00000010
 
 #define PROCESS_MAP_STACK	0
 #define PROCESS_MAP_ELF		1
@@ -124,7 +128,6 @@ struct task_struct {
 };
 
 int kthread_run(char *name, int (*fn)(void *arg), void *arg);
-pid_t sys_fork(pt_regs regs, u32 sp);
 int kernel_exec(char *filename);
 
 #endif

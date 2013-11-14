@@ -5,12 +5,19 @@ void delay(int a)
 
 int main(int argc, char **argv)
 {
-	int b;
+	int pid;
 
-	while (1) {
-		b = debug(1, 2, 3, 4);
-		debug(b, 0, 0, 0);
-		delay(500000);
+	pid = fork();
+	if (pid == 0) {
+		while (1) {
+			debug(0, 0, 0, 0);
+			delay(500000);
+		}
+	} else {
+		while (1) {
+			debug(1, 1, 1, 1);
+			delay(50000);
+		}
 	}
 
 	return 0;

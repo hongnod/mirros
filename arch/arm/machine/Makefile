@@ -1,4 +1,4 @@
-obj-asm := arm920t_s.o s3c2440_s.o entry.o ramdisk.o syscall.o
+obj-asm := arm920t_s.o s3c2440_s.o entry.o ramdisk.o syscall.o lib.o
 
 obj-c := arm920t_c.o s3c2440_c.o tq2440_init.o
 

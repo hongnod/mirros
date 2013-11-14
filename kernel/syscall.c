@@ -15,34 +15,12 @@ unsigned long *syscall_table_base = NULL;
 extern unsigned long syscall_table_start;
 extern unsigned long syscall_table_end;
 
-/*
-pid_t sys_fork(pt_regs *regs)
-{
-	u32 flag = 0;
-
-	flag |= PROCESS_TYPE_USER;
-
-	return do_fork(NULL, &regs, sp, flag);
-}
-
-pid_t sys_exec(pt_regs *regs)
-{
-	return do_exec()
-}
-
-int sys_open(pt_regs *regs, char *name, int flags)
-{
-	return NULL;
-}
-*/
-
 int sys_debug(pt_regs *regs, int a, int b, int c, int d)
 {
 	printk("syscall debug %d %d %d %d\n", a, b, c, d);
 
 	return a + b + c + d;
 }
-
 DEFINE_SYSCALL(debug, 0, sys_debug);
 
 int install_syscall(int nr, unsigned long *addr)
