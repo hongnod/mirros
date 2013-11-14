@@ -15,7 +15,7 @@ unsigned long *syscall_table_base = NULL;
 extern unsigned long syscall_table_start;
 extern unsigned long syscall_table_end;
 
-int sys_debug(pt_regs *regs, int a, int b, int c, int d)
+int sys_debug(int a, int b, int c, int d)
 {
 	printk("syscall debug %d %d %d %d\n", a, b, c, d);
 

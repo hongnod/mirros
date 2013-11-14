@@ -51,7 +51,7 @@ software_interrupt:
 	str r1, [sp, #60]	@ user_sp
 	str r2, [sp, #56]	@ user_lr
 
-	mov r4, sp		@ r4 is the base address of pt_regs
+	mov r8, sp		@ r8 is the base address of pt_regs
 
 	mrs r1, cpsr
 	bic r1, r1, #0xc0

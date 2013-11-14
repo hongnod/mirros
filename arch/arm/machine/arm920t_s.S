@@ -5,6 +5,16 @@ msr cpsr_c, #\mode
 .endm
 
 	.text
+
+/*
+ * fix it: this function can only be called
+ * in the entry of syscall
+ */
+.global arch_get_pt_regs
+arch_get_pt_regs:
+	mov r0, r8
+	mov pc, lr
+
 /*
  * code for schedule, there is only one case
  * will call this function, user_mode->syscall->

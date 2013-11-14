@@ -129,5 +129,9 @@ struct task_struct {
 
 int kthread_run(char *name, int (*fn)(void *arg), void *arg);
 int kernel_exec(char *filename);
+static inline pt_regs *get_pt_regs(void)
+{
+	return arch_get_pt_regs();
+}
 
 #endif

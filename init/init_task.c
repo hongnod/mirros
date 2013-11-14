@@ -25,8 +25,7 @@ int printk_thread(void *arg)
 int init_task(void *arg)
 {
 	kernel_exec("test");
-	kernel_exec("test-1");
-	kernel_exec("test-2");
+#if 1
 	kthread_run("printk1", printk_thread, (void *)1);
 	kthread_run("printk2", printk_thread, (void *)2);
 	kthread_run("printk3", printk_thread, (void *)3);
@@ -37,6 +36,6 @@ int init_task(void *arg)
 	kthread_run("printk8", printk_thread, (void *)8);
 	kthread_run("printk9", printk_thread, (void *)9);
 	kthread_run("printk10", printk_thread, (void *)10);
-
+#endif
 	return 0;
 }

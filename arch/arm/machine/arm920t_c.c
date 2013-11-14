@@ -471,6 +471,8 @@ void arch_set_mode_stack(u32 base, u32 mode)
 	);
 }
 
+
+
 #define MODE_STACK_SIZE		SIZE_4K
 int arch_init_exception_stack(void)
 {

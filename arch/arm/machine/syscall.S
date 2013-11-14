@@ -15,32 +15,33 @@ syscall_table_end: .word __syscall_table_end
 .global _syscall_handler
 _syscall_handler:
 	push {fp, lr}
+	push {r8}
 	add fp, sp, #4
 	sub sp, sp, #16
 
-	str r4, [fp, #-8]
-
-	ldr r3, [r4, #12]	@ arg3 the third arg for function
+	ldr r3, [r8, #16]	@ arg4
 	str r3, [sp]
+	ldr r3, [r8, #20]	@ arg5
+	str r3, [sp, #4]
 
-	mov r0, r4		@ arg0
-	ldr r1, [r0]		@ arg1
-	ldr r2, [r0, #4]	@ arg2
-	ldr r3, [r0, #8]	@ arg3
+	ldr r0, [r8]		@ arg0
+	ldr r1, [r8, #4]	@ arg1
+	ldr r2, [r8, #8]	@ arg2
+	ldr r3, [r8, #12]	@ arg3
 
-	ldr r5, =syscall_table_base
-	ldr r5, [r5]
-	ldr r7, [r4, #28]	@ load r7 to get the syscall number
-	add r5, r5, r7, lsl #2
-	ldr r5, [r5]
+	ldr r6, =syscall_table_base
+	ldr r6, [r6]
+	ldr r7, [r8, #28]	@ load r7 to get the syscall number
+	add r6, r6, r7, lsl #2
+	ldr r6, [r6]
 
 	mov lr, pc
-	mov pc, r5		@ goto syscall handler
-
-	ldr r4, [fp, #-8]	@ will return here, return value is r0
-	str r0, [r4]		@ store return valude to process context
+	mov pc, r6		@ goto syscall handler
 
 	sub sp, fp, #4
+
+	pop {r8}		@ will return here, return value is r0
+	str r0, [r8]		@ store return valude to process context
 
 	pop {fp, lr}
 	bx lr

@@ -613,7 +613,7 @@ int kthread_run(char *name, int (*fn)(void *arg), void *arg)
 	init_pt_regs(&regs, (void *)fn, arg);
 
 	kernel_debug("ready to fork a new task %s\n", name);
-	if (!do_fork(name, &regs, 0, flag)) {
+	if (do_fork(name, &regs, 0, flag)) {
 		kernel_error("create kernel thread failed\n");
 		return -ENOMEM;
 	}
@@ -795,9 +795,10 @@ int kernel_exec(char *filename)
 	return do_exec(filename, init_argv, init_envp, &regs);
 }
 
-pid_t sys_fork(pt_regs *regs)
+pid_t sys_fork(void)
 {
 	u32 flag = 0;
+	pt_regs *regs = get_pt_regs();
 
 	flag |= PROCESS_TYPE_USER | PROCESS_FLAG_FORK;
 
@@ -805,13 +806,11 @@ pid_t sys_fork(pt_regs *regs)
 }
 DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, sys_fork);
 
-/*
 pid_t sys_exec(pt_regs *regs)
 {
-	return do_exec()
+	return 0;
 }
-DEFINE_SYSCALL(exec, SYSCALL_EXEC_NR, sys_exec)
-*/
+DEFINE_SYSCALL(exec, SYSCALL_EXEC_NR, sys_exec);
 
 int build_idle_task(void)
 {

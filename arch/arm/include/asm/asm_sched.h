@@ -33,5 +33,6 @@ int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs);
 
 int arch_set_task_return_value(pt_regs *reg,
 		struct task_struct *task);
+pt_regs *arch_get_pt_regs(void);
 
 #endif
