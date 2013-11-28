@@ -36,4 +36,6 @@ typedef unsigned long 		stack_t;
 
 #define bit(nr) (1 << nr)
 
+#define __user
+
 #endif

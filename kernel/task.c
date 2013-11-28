@@ -720,9 +720,9 @@ int load_elf_image(struct task_struct *task,
 	return 0;
 }
 
-int do_exec(char *name,
-	    char **argv,
-	    char **envp,
+int do_exec(char __user *name,
+	    char __user **argv,
+	    char __user **envp,
 	    pt_regs *regs)
 {
 	struct task_struct *new;
@@ -759,7 +759,9 @@ int do_exec(char *name,
 	}
 
 	/*
-	 * load the elf file to memory
+	 * load the elf file to memory, the original process
+	 * will be coverd by new process. so if process load
+	 * failed, the process will be core dumped.
 	 */
 	err = load_elf_image(new, file, elf);
 	if (err) {
@@ -767,10 +769,20 @@ int do_exec(char *name,
 		goto release_elf_file;
 	}
 
+	/*
+	 * modify the regs for new process.
+	 */
 	init_pt_regs(regs, NULL, (void *)argv);
 	set_up_task_argv(new, argv);
-	set_up_task_stack(new, regs);
-	set_task_state(new, PROCESS_STATE_PREPARE);
+
+	/*
+	 * fix me - wether need to do this if exec
+	 * was called by user space process?
+	 */
+	if (current->flag & PROCESS_TYPE_KERNEL) {
+		set_task_state(new, PROCESS_STATE_PREPARE);
+		set_up_task_stack(new, regs);
+	}
 
 release_elf_file:
 	release_elf_file(elf);
@@ -792,7 +804,10 @@ int kernel_exec(char *filename)
 	memset((char *)&regs, 0, sizeof(pt_regs));
 	init_argv[0] = filename;
 	init_argv[1] = NULL;
-	return do_exec(filename, init_argv, init_envp, &regs);
+
+	return do_exec((char __user *)filename,
+		       (char __user **)init_argv,
+		       (char __user **)init_envp, &regs);
 }
 
 pid_t sys_fork(void)
@@ -806,11 +821,15 @@ pid_t sys_fork(void)
 }
 DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, sys_fork);
 
-pid_t sys_exec(pt_regs *regs)
+int sys_execve(char __user *filename,
+	       char __user **argv,
+	       char __user **envp)
 {
-	return 0;
+	pt_regs *regs = get_pt_regs();
+
+	return do_exec(filename, argv, envp, regs);
 }
-DEFINE_SYSCALL(exec, SYSCALL_EXEC_NR, sys_exec);
+DEFINE_SYSCALL(execve, SYSCALL_EXECVE_NR, sys_execve);
 
 int build_idle_task(void)
 {
