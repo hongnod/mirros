@@ -43,7 +43,7 @@ genramdisk: tools/genramdisk/genramdisk.c tools/genramdisk/ramdisk.h
 	@gcc -o tools/genramdisk/genramdisk tools/genramdisk/genramdisk.c
 
 application:
-	@cd tools/application && ./test.sh
+	@cd tools/application
 
 $(object): subsystem
 
