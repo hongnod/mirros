@@ -484,6 +484,9 @@ static int set_up_task_argv(struct task_struct *task,
 	struct page *page;
 	u32 *table_base;
 
+	if (!argv)
+		return -EINVAL;
+
 	/*
 	 * copy the argument to the process memory space
 	 * the argv is stored at the first page of the
@@ -780,8 +783,8 @@ int do_exec(char __user *name,
 	 * was called by user space process?
 	 */
 	if (current->flag & PROCESS_TYPE_KERNEL) {
-		set_task_state(new, PROCESS_STATE_PREPARE);
 		set_up_task_stack(new, regs);
+		set_task_state(new, PROCESS_STATE_PREPARE);
 	}
 
 release_elf_file:

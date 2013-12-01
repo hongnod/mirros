@@ -1,24 +1,11 @@
-void delay(int a)
-{
-	while (a--);
-}
-
 int main(int argc, char **argv)
 {
-	int pid;
+	int ret;
 
-	pid = fork();
-	if (pid == 0) {
-		while (1) {
-			debug(0, 0, 0, 0);
-			delay(500000);
-		}
-	} else {
-		while (1) {
-			debug(1, 1, 1, 1);
-			delay(50000);
-		}
+	ret = execve("test", 0, 0);
+	if (ret) {
+		debug(2, 2, 3, 4);
 	}
 
-	return 0;
+	while (1);
 }

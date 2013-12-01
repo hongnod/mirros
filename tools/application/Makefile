@@ -14,12 +14,21 @@ LDS := app.lds
 LDFLAG := -T$(LDS)
 LDPATH := -L/opt/FriendlyARM/toolschain/4.4.3/lib/gcc/arm-none-linux-gnueabi/4.4.3 -lgcc
 
+all: init test
+	@ echo "finish build application"
+
 init:
 	@ $(CC) $(CCFLAG) -c init.c -o init.o
 	@ $(LD) $(LDFLAG) -o init ./lib/main.o init.o -L./lib -lsyscall
 	@ $(OBJ_DUMP) -D init > ../../out/init.s
 	@ cp init ../../ramdisk/
 	@ rm init.o init
+test:
+	@ $(CC) $(CCFLAG) -c test.c -o test.o
+	@ $(LD) $(LDFLAG) -o test ./lib/main.o test.o -L./lib -lsyscall
+	@ $(OBJ_DUMP) -D test > ../../out/test.s
+	@ cp test ../../ramdisk/
+	@ rm test.o test
 
 libsyscall:
 	@ $(CC) $(CCFLAG) -c syscall/debug.S
@@ -28,7 +37,3 @@ libsyscall:
 	@ rm lib/libsyscall.a
 	@ $(AR) -rc lib/libsyscall.a debug.o execve.o fork.o
 	@ rm *.o
-
-all: init
-	@ echo "finish build application"
-

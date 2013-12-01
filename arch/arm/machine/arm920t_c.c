@@ -357,9 +357,11 @@ void arch_init_pt_regs(pt_regs *regs, void *fn, void *arg)
 		 */
 		char **tmp = (char **)arg;
 		int n = 0;
-		while (*tmp) {
-			n ++;
-			tmp ++;
+		if (tmp) {
+			while (*tmp) {
+				n ++;
+				tmp ++;
+			}
 		}
 		regs->r0 = n;
 		regs->r1 = PROCESS_USER_BASE;

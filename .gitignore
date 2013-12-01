@@ -9,6 +9,6 @@ boot.bin
 tools/skyeye/pc.log
 out/
 tools/genramdisk/genramdisk
-ramdisk/test
+ramdisk/
 *.patch
 tools/application/test
