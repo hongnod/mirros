@@ -20,6 +20,9 @@ pid_t get_new_pid(struct task_struct *task);
 int init_sched_struct(struct task_struct *task);
 int suspend_task_timeout(struct task_struct *task, int timeout);
 int wakeup_task(struct task_struct *task);
+int sched_remove_task(struct task_struct *task);
+pid_t get_task_pid(struct task_struct *task);
+struct task_struct *pid_get_task(pid_t pid);
 
 #define suspend_task(task)	suspend_task_timeout(task, -1);
 

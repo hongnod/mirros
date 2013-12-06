@@ -6,6 +6,7 @@ void delay(int a)
 int main(int argc, char **argv)
 {
 	int pid;
+	int i = 0;
 
 	pid = fork();
 	if (pid == 0) {
@@ -14,7 +15,7 @@ int main(int argc, char **argv)
 			delay(500000);
 		}
 	} else {
-		while (1) {
+		for (i = 0; i < 5; i ++) {
 			debug(1, 1, 1, 1);
 			delay(50000);
 		}

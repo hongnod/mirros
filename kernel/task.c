@@ -14,6 +14,8 @@
 #include <os/mm.h>
 #include <os/task.h>
 #include <os/syscall.h>
+#include <os/interrupt.h>
+#include <os/signal.h>
 
 #define MAX_ARGV	16
 #define MAX_ENVP	16
@@ -46,6 +48,7 @@ static int init_mm_struct(struct task_struct *task, u32 user_sp)
 static pid_t init_task_struct(struct task_struct *task, u32 flag)
 {
 	struct task_struct *parent;
+	unsigned long flags;
 
 	/*
 	 * if thread is a kernel thread, his parent is idle
@@ -75,11 +78,10 @@ static pid_t init_task_struct(struct task_struct *task, u32 flag)
 	task->parent = parent;
 	init_list(&task->p);
 	init_list(&task->child);
-	init_mutex(&task->mutex);
 
-	mutex_lock(&parent->mutex);
+	enter_critical(&flags);
 	list_add(&parent->child, &task->p);
-	mutex_unlock(&parent->mutex);
+	exit_critical(&flags);
 	
 	return task->pid;
 }
@@ -138,8 +140,11 @@ static int inline release_kernel_stack(struct task_struct *task)
 static int release_task_memory(struct task_struct *task)
 {
 
+	kernel_debug("-----1\n");
 	release_task_pages(task);
+	kernel_debug("-----2\n");
 	release_task_page_table(task);
+	kernel_debug("-----3\n");
 	release_kernel_stack(task);
 
 	return 0;
@@ -723,6 +728,59 @@ int load_elf_image(struct task_struct *task,
 	return 0;
 }
 
+int kill_task(struct task_struct *task)
+{
+	unsigned long flags;
+	int ret = 0;
+	struct task_struct *child;
+	struct list_head *list;
+	struct mutex *mutex;
+
+	if (!task)
+		return -EINVAL;
+	/*
+	 * set task state to idle in case it will run
+	 * during kill action
+	 */
+	set_task_state(task, PROCESS_STATE_IDLE);
+
+	ret = sched_remove_task(task);
+	if (ret) {
+		kernel_error("Can not remove task form sched\n");
+		return ret;
+	}
+
+	/*
+	 * remove task from parent modify the child task's parent
+	 * to task's parent
+	 */
+	enter_critical(&flags);
+	list_del(&task->p);
+	list_for_each(&task->child, list) {
+		child = list_entry(list, struct task_struct, p);
+		child->parent = task->parent;
+		list_add_tail(&task->parent->child, list);
+	}
+
+	/*
+	 * deal with the mutex which task has wait and get
+	 * remove the task from the mutex list which he has
+	 * got, unlock all mutex which he has got.
+	 */
+	if (!is_list_empty(&task->wait))
+		list_del(&task->wait);
+
+	list_for_each(&task->mutex_get, list) {
+		mutex = list_entry(list, struct mutex, task);
+		mutex_unlock(mutex);
+	}
+	exit_critical(&flags);
+
+	release_task(task);
+
+	return 0;
+}
+
 int do_exec(char __user *name,
 	    char __user **argv,
 	    char __user **envp,
@@ -740,6 +798,7 @@ int do_exec(char __user *name,
 		 * becase kernel process has not allocat page
 		 * table and mm_struct.
 		 */
+		printk("-----ddddddd\n");
 		new = fork_new_task(name, PROCESS_USER_STACK_BASE, PROCESS_TYPE_USER);
 		if (!new) {
 			kernel_debug("can not fork new process when exec\n");
@@ -768,7 +827,7 @@ int do_exec(char __user *name,
 	 */
 	err = load_elf_image(new, file, elf);
 	if (err) {
-		kernel_error("failed to load elf file to memory\n");
+		kernel_error("Failed to load elf file to memory\n");
 		goto release_elf_file;
 	}
 
@@ -822,7 +881,7 @@ pid_t sys_fork(void)
 
 	return do_fork(NULL, regs, regs->sp, flag);
 }
-DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, sys_fork);
+DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, (void *)sys_fork);
 
 int sys_execve(char __user *filename,
 	       char __user **argv,
@@ -832,7 +891,16 @@ int sys_execve(char __user *filename,
 
 	return do_exec(filename, argv, envp, regs);
 }
-DEFINE_SYSCALL(execve, SYSCALL_EXECVE_NR, sys_execve);
+DEFINE_SYSCALL(execve, SYSCALL_EXECVE_NR, (void *)sys_execve);
+
+void sys_exit(int ret)
+{
+	struct task_struct *task = current;
+
+	kernel_debug("task %s exit with code %d\n", task->name);
+	sys_signal(get_task_pid(current), PROCESS_SIGNAL_KILL, NULL);
+}
+DEFINE_SYSCALL(exit, SYSCALL_EXIT_NR, (void *)sys_exit);
 
 int build_idle_task(void)
 {
@@ -840,11 +908,7 @@ int build_idle_task(void)
 	if (idle == NULL)
 		return -ENOMEM;
 
-	idle->pid = get_new_pid(idle);
-	if (idle->pid != 0) {
-		kfree(idle);
-		return -EFAULT;
-	}
+	idle->pid = -1;
 	idle->uid = 0;
 
 	strncpy(idle->name, "idle", PROCESS_NAME_SIZE - 1);
@@ -854,7 +918,6 @@ int build_idle_task(void)
 	init_list(&idle->child);
 	init_list(&idle->p);
 
-	init_mutex(&idle->mutex);
 	init_sched_struct(idle);
 	idle->state = PROCESS_STATE_RUNNING;
 

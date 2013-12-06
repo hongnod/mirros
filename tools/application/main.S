@@ -2,4 +2,6 @@
 
 .global __start
 __start:
-	b main
+	bl main
+	b exit
+	nop

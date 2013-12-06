@@ -1,6 +1,6 @@
 obj-c  = bitops.o mutex.o string.o interrupt.o mmu.o  \
 	 printk.o sched.o task.o elf.o io.o panic.o \
-	 ramdisk.o syscall.o
+	 ramdisk.o syscall.o signal.o
 
 out-dir := $(OUT_KERNEL)
 

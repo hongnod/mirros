@@ -4,7 +4,7 @@
 /*
  * whether use host to test some componment of kernel
  */
-#define LOG_LEVEL	2
+#define LOG_LEVEL	4
 
 #define HZ		100
 

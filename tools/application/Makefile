@@ -30,10 +30,14 @@ test:
 	@ cp test ../../ramdisk/
 	@ rm test.o test
 
+main:
+	@ $(CC) $(CCFLAG) -c main.S -o lib/main.o
+
 libsyscall:
 	@ $(CC) $(CCFLAG) -c syscall/debug.S
 	@ $(CC) $(CCFLAG) -c syscall/execve.S
 	@ $(CC) $(CCFLAG) -c syscall/fork.S
+	@ $(CC) $(CCFLAG) -c syscall/exit.S
 	@ rm lib/libsyscall.a
-	@ $(AR) -rc lib/libsyscall.a debug.o execve.o fork.o
+	@ $(AR) -rc lib/libsyscall.a debug.o execve.o fork.o exit.o
 	@ rm *.o

@@ -24,6 +24,8 @@ extern int arch_init_exception_stack(void);
 extern int init_task();
 extern unsigned long mount_ramdisk(void);
 extern int syscall_init(void);
+extern int system_killer(void *arg);
+extern int init_signal_handler(void);
 
 int main(void)
 {
@@ -48,6 +50,7 @@ int main(void)
 	arch_init_exception_stack();
 	arch_irq_init();
 	syscall_init();
+	init_signal_handler();
 	sched_init();
 	timer_tick_init();
 
@@ -60,6 +63,10 @@ int main(void)
 	 */
 	mount_ramdisk();
 
+	/*
+	 * system_killer process is fixed as 0
+	 */
+	kthread_run("system_killer", system_killer, NULL);
 	init_task();
 	enable_irqs();
 

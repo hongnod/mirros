@@ -78,7 +78,7 @@ struct task_struct {
 	void *stack_origin;
 	char name[16];
 
-	u32 pid;
+	pid_t pid;
 	u32 uid;
 
 	struct mm_struct mm_struct;
@@ -107,7 +107,7 @@ struct task_struct {
 	 * list is attach to them
 	 */
 	int run_time;
-	int wait_time;
+	int wait_time;	/* 0-wait time is expire >0:wait time -1:do not wait */
 	int time_out;
 	u32 run_count;
 	int prio;
@@ -116,19 +116,20 @@ struct task_struct {
 	struct list_head system;
 	struct list_head sleep;
 	struct list_head idle;
-	struct list_head wait;
 
-	/* mutex for this task_struct
-	 * when need to modify the data of this task_struct
-	 * we must get this mutex TBD
+	/*
+	 * mutex which task wait and got, wait list only can
+	 * have one mutex but get list can have many.
 	 */
-	struct mutex mutex;
+	struct list_head wait;
+	struct list_head mutex_get;
 
 	void *message;
 };
 
 int kthread_run(char *name, int (*fn)(void *arg), void *arg);
 int kernel_exec(char *filename);
+int kill_task(struct task_struct *task);
 static inline pt_regs *get_pt_regs(void)
 {
 	return arch_get_pt_regs();

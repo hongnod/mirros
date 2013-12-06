@@ -9,6 +9,7 @@
 #include <os/printk.h>
 #include <asm/asm_interrupt.h>
 #include <os/task.h>
+#include <os/syscall.h>
 
 struct sched_list {
 	struct list_head list;
@@ -65,7 +66,7 @@ int in_interrupt = 0;
 		task_##name.count++;		\
 	} while(0)
 
-#define sched_list_del_task(name,task)	\
+#define sched_list_del_task(name, task)	\
 	do {						\
 		list_del(&task->name);	\
 		task_##name.count--;		\
@@ -100,6 +101,32 @@ static void inline prio_list_del_task(struct task_struct *task)
 {
 	list_del(&task->prio_running);
 	os_sched_table[task->prio].count--;
+}
+
+/*
+ * this function is used to remove a stoped task from system
+ * if the state of the task is not IDLE, we can not remove it
+ */
+int sched_remove_task(struct task_struct *task)
+{
+	pid_t pid = get_task_pid(task);
+	unsigned long flags;
+
+	if (get_task_state(task) != PROCESS_STATE_IDLE)
+		return -EINVAL;
+
+	/*
+	 * we also can nor remove init and idle task
+	 */
+	if ((pid == 1) || (pid == 0))
+		return -EINVAL;
+
+	enter_critical(&flags);
+	sched_list_del_task(idle, task);
+	sched_list_del_task(system, task);
+	exit_critical(&flags);
+
+	return 0;
 }
 
 typedef enum _state_change_t {
@@ -279,6 +306,8 @@ int init_sched_struct(struct task_struct *task)
 	init_list(&task->system);
 	init_list(&task->sleep);
 	init_list(&task->idle);
+
+	init_list(&task->mutex_get);
 	init_list(&task->wait);
 
 	return 0;
@@ -315,6 +344,17 @@ out:
 
 	return 0;
 }
+
+pid_t get_task_pid(struct task_struct *task)
+{
+	return task->pid;
+}
+
+pid_t sys_get_pid(void)
+{
+	return get_task_pid(current);
+}
+DEFINE_SYSCALL(get_pid, SYSCALL_GET_PID_NR, (void *)sys_get_pid);
 
 struct task_struct *pid_get_task(pid_t pid)
 {
@@ -480,34 +520,26 @@ int suspend_task_timeout(struct task_struct *task, int timeout)
 	}
 
 	enter_critical(&flags);
-
 	/*
 	 * get the state of the task, if task state is idle
 	 * then return;
 	 */
 	state = get_task_state(task);
-	if (state == PROCESS_STATE_RUNNING) {
+	if (state != PROCESS_STATE_IDLE) {
+		task->wait_time = timeout;
+		task->time_out = 0;
 		set_task_state(task, PROCESS_STATE_SLEEP);
 	}
 	else {
 		/*
-		 * only running task can directly go to sleep state
+		 * idle task can not go to sleep state
 		 */
 		exit_critical(&flags);
 		return -EINVAL;
 	}
-
-	/*
-	 * set task timeout, and remove it from current list
-	 * then add it to sleep list.
-	 */
-	task->wait_time = timeout;
-	task->time_out = 0;
-
 	exit_critical(&flags);
 
 	sched();
-
 	return task->time_out;
 }
 
@@ -518,14 +550,29 @@ int wakeup_task(struct task_struct *task)
 	if (get_task_state(task) != PROCESS_STATE_SLEEP)
 		return -EINVAL;
 
-	enter_critical(&flags);
-
 	get_task_run_time(task);
 	set_task_state(task, PROCESS_STATE_PREPARE);
 
-	exit_critical(&flags);
-
 	return 0;
+}
+
+/*
+ * system killer task is used to kill idle process
+ */
+int system_killer(void *arg)
+{
+	struct list_head *list;
+	struct task_struct *task;
+
+	for (; ;) {
+		kernel_debug("Enter in system killer process\n");
+		sched_list_for_each(idle, list) {
+			task = list_entry(list, struct task_struct, idle);
+			kill_task(task);
+		}
+
+		suspend_task(current);
+	}
 }
 
 int sched_init(void)
