@@ -27,6 +27,7 @@ int task_kill_self(struct task_struct *task)
 	 * wake up system_killer process to help doing
 	 * this
 	 */
+	kernel_debug("Kill self\n");
 	set_task_state(task, PROCESS_STATE_IDLE);
 	wakeup_task(system_killer);
 	sched();
@@ -46,6 +47,8 @@ int signal_kill(struct signal *signal)
 
 	from = pid_get_task(signal->from);
 	to = pid_get_task(signal->to);
+	kernel_debug("Kill task from is 0x%x, to is 0x%x\n", from, to);
+	kernel_debug("Kill task from name is %s state is %d\n", from->name, from->state);
 
 	/*
 	 * if from == to, it means task has stoped and 
@@ -53,15 +56,17 @@ int signal_kill(struct signal *signal)
 	 * to kill another task, low prio can not kill
 	 * the task whose prio is higher than him
 	 */
-	if (from->prio > to->prio) {
+	if ((signal->from) == (signal->to)) {
 		ret = task_kill_self(from);
 	}
-	else if (from->prio == to->prio){
-		ret = task_kill_other(from, to);
-	}
 	else {
-		kernel_error("Can not kill task %d --> %d\n", signal->from, signal->to);
-		ret = -EINVAL;
+		if (from->prio < to->prio)
+			ret = task_kill_other(from, to);
+		else {
+			kernel_error("Can not kill task %d --> %d\n",
+				     signal->from, signal->to);
+			ret = -EINVAL;
+		}
 	}
 
 	return ret;
@@ -101,6 +106,7 @@ int sys_signal(pid_t pid, signal_t sig, void *arg)
 {
 	struct signal signal;
 
+	kernel_debug("sys signal pid is %d\n", pid);
 	signal.from = get_task_pid(current);
 	signal.to = pid;
 	signal.sig = sig;

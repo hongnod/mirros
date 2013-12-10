@@ -27,9 +27,7 @@ static int init_mm_struct(struct task_struct *task, u32 user_sp)
 	struct mm_struct *mm = &task->mm_struct;
 	struct mm_struct *mmp;
 	
-	/*
-	 * init mm_struct, kernel task do not need this
-	 */
+	/* init mm_struct, kernel task do not need this */
 	if (task->flag & PROCESS_TYPE_USER) {
 		mmp = &task->parent->mm_struct;
 		mm->elf_size = mmp->elf_size;
@@ -45,24 +43,20 @@ static int init_mm_struct(struct task_struct *task, u32 user_sp)
 	return 0;
 }
 
-static pid_t init_task_struct(struct task_struct *task, u32 flag)
+static int init_task_struct(struct task_struct *task, u32 flag)
 {
 	struct task_struct *parent;
 	unsigned long flags;
 
-	/*
-	 * if thread is a kernel thread, his parent is idle
-	 */
+	/* if thread is a kernel thread, his parent is idle */
 	if (flag & PROCESS_TYPE_KERNEL)
 		parent = idle;
 	else
 		parent = current;
 
-	/*
-	 * get a new pid
-	 */
+	/* get a new pid */
 	task->pid = get_new_pid(task);
-	if (task->pid == 0)
+	if ((task->pid) < 0)
 		return -EINVAL;
 
 	task->uid = parent->uid;
@@ -72,9 +66,7 @@ static pid_t init_task_struct(struct task_struct *task, u32 flag)
 	task->flag = flag;
 	task->state = 0;
 
-	/*
-	 * add task to the child list of his parent.
-	 */
+	/* add task to the child list of his parent. */
 	task->parent = parent;
 	init_list(&task->p);
 	init_list(&task->child);
@@ -83,7 +75,7 @@ static pid_t init_task_struct(struct task_struct *task, u32 flag)
 	list_add(&parent->child, &task->p);
 	exit_critical(&flags);
 	
-	return task->pid;
+	return 0;
 }
 
 static void _release_task_memory(struct list_head *head)
@@ -104,9 +96,7 @@ static int release_task_page_table(struct task_struct *task)
 {
 	struct mm_struct *tmp = &task->mm_struct;
 
-	/*
-	 * release task's page table
-	 */
+	/* release task's page table */
 	_release_task_memory(&tmp->stack_list);
 	_release_task_memory(&tmp->elf_list);
 
@@ -129,8 +119,8 @@ static int inline release_task_pages(struct task_struct *task)
 
 static int inline release_kernel_stack(struct task_struct *task)
 {
-	if (task->stack_base)
-		free_pages(task->stack_base);
+	if (task->stack_origin)
+		free_pages(task->stack_origin);
 
 	task->stack_base = NULL;
 	task->stack_origin = NULL;
@@ -140,11 +130,10 @@ static int inline release_kernel_stack(struct task_struct *task)
 static int release_task_memory(struct task_struct *task)
 {
 
-	kernel_debug("-----1\n");
-	release_task_pages(task);
-	kernel_debug("-----2\n");
-	release_task_page_table(task);
-	kernel_debug("-----3\n");
+	if (task->flag & PROCESS_TYPE_USER) {
+		release_task_pages(task);
+		release_task_page_table(task);
+	}
 	release_kernel_stack(task);
 
 	return 0;
@@ -180,9 +169,7 @@ static int alloc_page_table(struct task_struct *new)
 	}
 	tmp->stack_curr = list_next(&tmp->stack_list);
 
-	/*
-	 * allocate page table for elf file memory
-	 */
+	/* allocate page table for elf file memory */
 	for (i=0; i < e; i ++) {
 		addr = get_free_page(GFP_PGT);
 		kernel_debug("allcoate elf page_table 0x%x\n", (u32)addr);
@@ -201,7 +188,6 @@ error:
 
 	return -ENOMEM;
 }
-
 
 static int task_map_memory(void *addr, struct task_struct *task, int flag)
 {
@@ -225,9 +211,7 @@ static int task_map_memory(void *addr, struct task_struct *task, int flag)
 
 repeat:
 	if (list == NULL) {
-		/*
-		 * page table has been used over,need more,TBD
-		 */
+		/*  page table has been used over,need more,TBD */
 		return -ENOMEM;
 	}
 
@@ -265,11 +249,9 @@ static int alloc_memory_and_map(struct task_struct *task)
 	s = page_nr(PROCESS_STACK_SIZE);
 	e = page_nr(PROCESS_IMAGE_SIZE);
 
-	/*
-	 * if there are no enough memory for task
-	 */
+	/* if there are no enough memory for task */
 	if (mm_free_page(MM_ZONE_NORMAL) < (s + e)) {
-		kernel_error("bug: no enough memory\n");
+		kernel_error("Bug: no enough memory\n");
 		return -ENOMEM;
 	}
 
@@ -371,9 +353,7 @@ static int copy_process_memory(struct task_struct *old,struct task_struct *new)
 
 	flush_cache();
 
-	/*
-	 * copy stack
-	 */
+	/* copy stack */
 	for (i = 0; i < s; i ++) {
 		list_old = list_next(list_old);
 		list_new = list_next(list_new);
@@ -384,9 +364,7 @@ static int copy_process_memory(struct task_struct *old,struct task_struct *new)
 		copy_page_va(new_base, old_base);
 	}
 
-	/*
-	 * copy elf memory to new task
-	 */
+	/* copy elf memory to new task */
 	list_old = &old_mm->elf_image_list;
 	list_new = &new_mm->elf_image_list;
 	for (i = 0; i < e; i++) {
@@ -465,9 +443,7 @@ int switch_task(struct task_struct *cur,
 		stack_base -= SIZE_NM(4);
 	}
 
-	/*
-	 * load elf image memory page table
-	 */
+	/* load elf image memory page table */
 	head = &next->mm_struct.elf_list;
 	list_for_each (head, list) {
 		page = list_entry(list, struct page, pgt_list);
@@ -529,7 +505,6 @@ static int inline set_task_return_value(pt_regs *reg,
 
 struct task_struct *fork_new_task(char *name, u32 user_sp, u32 flag)
 {
-	pid_t pid;
 	struct task_struct *new;
 	int ret = 0;
 
@@ -539,9 +514,9 @@ struct task_struct *fork_new_task(char *name, u32 user_sp, u32 flag)
 		return NULL;
 	}
 
-	pid = init_task_struct(new, flag);
-	if (pid == 0) {
-		kernel_error("invaild pid \n");
+	ret = init_task_struct(new, flag);
+	if (ret) {
+		kernel_error("Invaild pid \n");
 		goto exit;
 	}
 
@@ -555,9 +530,7 @@ struct task_struct *fork_new_task(char *name, u32 user_sp, u32 flag)
 	if (name)
 		strncpy(new->name, name, 15);
 	
-	/*
-	 * allocate page table and memory for task
-	 */
+	/* allocate page table and memory for task */
 	ret = alloc_memory_for_task(new);
 	if (ret) {
 		kernel_error("allocate memory for task failed\n");
@@ -573,13 +546,11 @@ exit:
 	return new;
 }
 
-static pid_t do_fork(char *name, pt_regs *regs, u32 user_sp, u32 flag)
+int do_fork(char *name, pt_regs *regs, u32 user_sp, u32 flag)
 {
 	struct task_struct *new;
 
-	/*
-	 * get a new task_struct instance
-	 */
+	/* get a new task_struct instance */
 	new = fork_new_task(name, user_sp, flag);
 	if (!new) {
 		kernel_error("fork new task failed\n");
@@ -594,6 +565,7 @@ static pid_t do_fork(char *name, pt_regs *regs, u32 user_sp, u32 flag)
 	if (flag & PROCESS_TYPE_USER)
 		copy_process(new);
 
+	/* task is forked by sys_fork */
 	if (flag & PROCESS_FLAG_FORK)
 		set_task_return_value(regs, new);
 
@@ -629,10 +601,6 @@ int kthread_run(char *name, int (*fn)(void *arg), void *arg)
 	return 0;
 }
 
-/*
- * this function is used to kill a task
- * and recycle its resource
- */
 void release_task(struct task_struct *task)
 {
 	if (task) {
@@ -660,9 +628,7 @@ int load_elf_section(struct elf_section *section,
 	    (section->size == 0))
 		return -EINVAL;
 
-	/*
-	 * find the memeory location in the list
-	 */
+	/* find the memeory location in the list */
 	base = section->load_addr - PROCESS_USER_BASE;
 	i = base / SIZE_4K;
 	j = base % SIZE_4K;
@@ -716,9 +682,7 @@ int load_elf_image(struct task_struct *task,
 	if (!task || !file || !elf)
 		return -ENOENT;
 
-	/*
-	 * load each section to memory
-	 */
+	/* load each section to memory */
 	for ( ; section != NULL; section = section->next) {
 		ret = load_elf_section(section, file, mm);
 		if (ret)
@@ -798,7 +762,6 @@ int do_exec(char __user *name,
 		 * becase kernel process has not allocat page
 		 * table and mm_struct.
 		 */
-		printk("-----ddddddd\n");
 		new = fork_new_task(name, PROCESS_USER_STACK_BASE, PROCESS_TYPE_USER);
 		if (!new) {
 			kernel_debug("can not fork new process when exec\n");
@@ -825,15 +788,15 @@ int do_exec(char __user *name,
 	 * will be coverd by new process. so if process load
 	 * failed, the process will be core dumped.
 	 */
+	strncpy(new->name, name, 15);
 	err = load_elf_image(new, file, elf);
 	if (err) {
 		kernel_error("Failed to load elf file to memory\n");
 		goto release_elf_file;
 	}
+	flush_cache();
 
-	/*
-	 * modify the regs for new process.
-	 */
+	/* modify the regs for new process. */
 	init_pt_regs(regs, NULL, (void *)argv);
 	set_up_task_argv(new, argv);
 
@@ -871,36 +834,6 @@ int kernel_exec(char *filename)
 		       (char __user **)init_argv,
 		       (char __user **)init_envp, &regs);
 }
-
-pid_t sys_fork(void)
-{
-	u32 flag = 0;
-	pt_regs *regs = get_pt_regs();
-
-	flag |= PROCESS_TYPE_USER | PROCESS_FLAG_FORK;
-
-	return do_fork(NULL, regs, regs->sp, flag);
-}
-DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, (void *)sys_fork);
-
-int sys_execve(char __user *filename,
-	       char __user **argv,
-	       char __user **envp)
-{
-	pt_regs *regs = get_pt_regs();
-
-	return do_exec(filename, argv, envp, regs);
-}
-DEFINE_SYSCALL(execve, SYSCALL_EXECVE_NR, (void *)sys_execve);
-
-void sys_exit(int ret)
-{
-	struct task_struct *task = current;
-
-	kernel_debug("task %s exit with code %d\n", task->name);
-	sys_signal(get_task_pid(current), PROCESS_SIGNAL_KILL, NULL);
-}
-DEFINE_SYSCALL(exit, SYSCALL_EXIT_NR, (void *)sys_exit);
 
 int build_idle_task(void)
 {

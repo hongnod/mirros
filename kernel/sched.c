@@ -76,8 +76,8 @@ int in_interrupt = 0;
 	list_for_each((&task_##head.list), list)
 
 /*
- *used to trace the all task in the system with
- *different state
+ * used to trace the all task in the system with
+ * different state
  */
 DECLARE_SCHED_LIST(system);
 DECLARE_SCHED_LIST(idle);
@@ -115,9 +115,7 @@ int sched_remove_task(struct task_struct *task)
 	if (get_task_state(task) != PROCESS_STATE_IDLE)
 		return -EINVAL;
 
-	/*
-	 * we also can nor remove init and idle task
-	 */
+	/* we also can nor remove init and idle task */
 	if ((pid == 1) || (pid == 0))
 		return -EINVAL;
 
@@ -144,9 +142,7 @@ typedef enum _state_change_t {
 	STATE_NONE_TO_NONE,
 } state_change_t;
 
-/*
- * old, new, value
- */
+/* old, new, value */
 #define CHANGE_TABLE_SIZE	(13 * 3)
 static char change_table[CHANGE_TABLE_SIZE] = {
 	PROCESS_STATE_UNKNOWN, PROCESS_STATE_PREPARE, STATE_NONE_TO_PREPARE,
@@ -219,6 +215,7 @@ void set_task_state(struct task_struct *task, state_t state)
 			prio_list_add_task_tail(task);
 			break;
 		case STATE_RUNNING_TO_IDLE:
+			kernel_debug("task state run to idle\n");
 			sched_list_add_task_tail(idle, task);
 			break;
 		case STATE_SLEEP_TO_PREPARE:
@@ -256,7 +253,7 @@ static int init_pid_allocater(void)
 	pid_map.nr = (PID_MAP_PAGE_NR * PAGE_SIZE) / sizeof(void *);
 	pid_map.nr_free = pid_map.nr;
 	pid_map.current = 0;
-	pid_map.addr = get_free_page(GFP_KERNEL);
+	pid_map.addr = get_free_pages(PID_MAP_PAGE_NR, GFP_KERNEL);
 	if (pid_map.addr == NULL) {
 		return -ENOMEM;
 	}
@@ -274,27 +271,28 @@ static void get_task_run_time(struct task_struct *task)
 int init_sched_struct(struct task_struct *task)
 {
 
-	if ((task->parent) && (task->parent != idle)) {
-		task->prio = task->parent->prio;
-		task->pre_prio = task->parent->pre_prio;
-	}
-	else if ((task->parent) && (task->parent == idle)) {
-		/*kernel thread*/
+	if ((task->flag & PROCESS_TYPE_KERNEL) && (task->pid >= 0)) {
+		/* kernel thread except idle */
 		task->prio = KERNEL_THREAD_PRIO;
 		task->pre_prio = KERNEL_THREAD_PRIO;
 	}
+	else if ((task->flag & PROCESS_TYPE_USER) && (task->pid == 1)) {
+		/* init process */
+		task->prio = PROCESS_DEFAULT_PRIO;
+		task->pre_prio = PROCESS_DEFAULT_PRIO;
+	}
+	else if ((task->flag & PROCESS_TYPE_USER) && (task->pid > 1)) {
+		/* other process */
+		task->prio = task->parent->prio;
+		task->pre_prio = task->prio;
+	}
 	else {
-		/*
-		 * idle process
-		 */
+		/* idle process */
 		task->prio = MAX_PRIO - 1;
 		task->pre_prio = task->prio;
 	}
 
-	/*
-	 * this value will be set to a default value
-	 * later
-	 */
+	/*  this value will be set to a default value later */
 	get_task_run_time(task);
 	task->wait_time = -1;
 	task->time_out = 0;
@@ -317,7 +315,7 @@ pid_t get_new_pid(struct task_struct *task)
 {
 	int i;
 	struct pid_map *map = &pid_map;
-	u32 *base = map->addr;
+	u32 *base =(u32 *)map->addr;
 
 	mutex_lock(&map->pid_map_mutex);
 
@@ -329,20 +327,16 @@ pid_t get_new_pid(struct task_struct *task)
 			map->nr_free--;
 			map->current++;
 			base[i] = (u32)task;
+
 			mutex_unlock(&map->pid_map_mutex);
-
 			return i;
-		}
-
-		if (i == map->nr-1) {
-			i = 0;
 		}
 	}
 
 out:
 	mutex_unlock(&map->pid_map_mutex);
 
-	return 0;
+	return (-1);
 }
 
 pid_t get_task_pid(struct task_struct *task)
@@ -362,7 +356,7 @@ struct task_struct *pid_get_task(pid_t pid)
 	
 	if (pid < pid_map.nr) {
 		addr = pid_map.addr;
-		return (struct task_struct *)(addr + pid);
+		return (struct task_struct *)(*(addr + pid));
 	}
 
 	return NULL;
@@ -374,9 +368,7 @@ static struct task_struct *find_next_run_task(void)
 	struct list_head *task_head;
 	struct task_struct *task;
 
-	/*
-	 * idle process is always on preparing state
-	 */
+	/* idle process is always on preparing state */
 	for (i = 0; i < MAX_PRIO - 1; i++) {
 		if (os_sched_table[i].count) {
 			break;
@@ -431,9 +423,7 @@ static int prepare_to_switch(struct task_struct *next)
 	set_task_state(next, PROCESS_STATE_RUNNING);
 
 re_run:
-	/*
-	 * delete from prepare list and ready to run.
-	 */
+	/* delete from prepare list and ready to run. */
 	next->run_count++;
 	get_task_run_time(next);
 
@@ -486,9 +476,7 @@ int os_tick_handler(void *arg)
 			task->wait_time--;
 		}
 
-		/*
-		 * task has timeout and need to wake up
-		 */
+		/* task has timeout and need to wake up */
 		if (task->wait_time == 0) {
 			set_task_state(task, PROCESS_STATE_PREPARE);
 		}
@@ -531,9 +519,7 @@ int suspend_task_timeout(struct task_struct *task, int timeout)
 		set_task_state(task, PROCESS_STATE_SLEEP);
 	}
 	else {
-		/*
-		 * idle task can not go to sleep state
-		 */
+		/*  idle task can not go to sleep state */
 		exit_critical(&flags);
 		return -EINVAL;
 	}
@@ -550,15 +536,14 @@ int wakeup_task(struct task_struct *task)
 	if (get_task_state(task) != PROCESS_STATE_SLEEP)
 		return -EINVAL;
 
+	kernel_debug("wake up task %s\n", task->name);
 	get_task_run_time(task);
 	set_task_state(task, PROCESS_STATE_PREPARE);
 
 	return 0;
 }
 
-/*
- * system killer task is used to kill idle process
- */
+/* system killer task is used to kill idle process */
 int system_killer(void *arg)
 {
 	struct list_head *list;
