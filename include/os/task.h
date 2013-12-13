@@ -8,8 +8,8 @@
 #include <asm/config.h>
 
 #define KERNEL_STACK_SIZE	ARCH_KERNEL_STACK_SIZE
-#define PROCESS_STACK_SIZE	(4 * PAGE_SIZE)
-#define PROCESS_IMAGE_SIZE	(256 * PAGE_SIZE)
+#define PROCESS_STACK_SIZE	(4 * PAGE_SIZE)		/* 16k stack size */
+#define PROCESS_IMAGE_SIZE	(256 * PAGE_SIZE)	/* 1M stack size */
 
 #define PROCESS_NAME_SIZE	16
 
@@ -76,36 +76,20 @@ struct mm_struct {
 struct task_struct {
 	void *stack_base;
 	void *stack_origin;
-	char name[16];
+
+	char name[PROCESS_NAME_SIZE + 1];
+	u32 flag;
 
 	pid_t pid;
 	u32 uid;
-
-	struct mm_struct mm_struct;
-
 	state_t state,exit_state;
 	u32 signal,exit_code;
 
-	u32 flag;
-
+	struct mm_struct mm_struct;
 	struct task_struct *parent;
 	struct list_head child;
 	struct list_head p;
 
-	/*
-	 * below member are used to schedule.
-	 * run_time: each task have his run slice
-	 * wait_time: if a task was wait for a event, this
-	 *	     member can set to the wait time
-	 * time_out: wether this task wait for someting time out
-	 * run_count: how many time has this task runed.
-	 * prio: the prio of this task
-	 * pre_prio: previous prio of this task
-	 * prio_running: if the task is in running state, this list is
-	 * attach to the prio prepare list.
-	 * wiat : when task was wait for a mutex or other things, this
-	 * list is attach to them
-	 */
 	int run_time;
 	int wait_time;	/* 0-wait time is expire >0:wait time -1:do not wait */
 	int time_out;

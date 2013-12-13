@@ -15,25 +15,26 @@ unsigned long *syscall_table_base = NULL;
 extern unsigned long syscall_table_start;
 extern unsigned long syscall_table_end;
 
-int sys_debug(int a, int b, int c, int d)
+int sys_debug(char *buf)
 {
-	printk("syscall debug %d %d %d %d\n", a, b, c, d);
+	printk(buf);
 
-	return a + b + c + d;
+	return 0;
 }
-DEFINE_SYSCALL(debug, 0, sys_debug);
+DEFINE_SYSCALL(debug, __NR_debug, sys_debug);
 
 int install_syscall(int nr, unsigned long *addr)
 {
 	unsigned long *tmp;
 	int error = -EINVAL;
+	int real_nr = nr - __NR_SYSCALL_BASE;
 
-	if (nr > (SYSCALL_NR - 1) || (nr <0) || (!addr)) {
+	if (real_nr > (SYSCALL_NR - 1) || (real_nr < 0) || (!addr)) {
 		kernel_error("invaild argument for install syscall\n");
 		return -EINVAL;
 	}
 
-	tmp = syscall_table_base + nr;
+	tmp = syscall_table_base + real_nr;
 	if (!(*tmp)) {
 		kernel_info("install %d syscall addr is0x%x\n", nr, (u32)addr);
 		*tmp = (unsigned long)addr;
@@ -42,6 +43,13 @@ int install_syscall(int nr, unsigned long *addr)
 	}
 
 	return error;
+}
+
+int default_syscall_handler(void)
+{
+	kernel_error("Unsupport syscall call\n");
+
+	return 0;
 }
 
 int syscall_init(void)

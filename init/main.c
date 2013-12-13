@@ -30,19 +30,18 @@ extern int init_signal_handler(void);
 int main(void)
 {
 	/*
-	 *this function can let us use printk before 
-	 *kernel mmu page table build
+	 * this function can let us use printk before 
+	 * kernel mmu page table build
 	 */
 	disable_irqs();
 	console_early_init();
-
 	init_platform_info();
 	mm_init();
 
 	/*
-	 *after kernel mmu talbe build,we need init the
-	 *console again to use the uart0,or we can implement
-	 *a more stronger printk system if needed.
+	 * after kernel mmu talbe build,we need init the
+	 * console again to use the uart0,or we can implement
+	 * a more stronger printk system if needed.
 	 */
 	console_late_init();
 	slab_init();
@@ -51,23 +50,14 @@ int main(void)
 	arch_irq_init();
 	syscall_init();
 	init_signal_handler();
-	sched_init();
 	timer_tick_init();
-
-	if (build_idle_task()) {
-		panic("can not build kernel task\n");
-	}
-
-	/*
-	 *now we can enable irq
-	 */
+	sched_init();
 	mount_ramdisk();
 
-	/*
-	 * system_killer process is fixed as 0
-	 */
+	build_idle_task();
 	kthread_run("system_killer", system_killer, NULL);
 	init_task();
+	/* now we can enable irq */
 	enable_irqs();
 
 	for (;;) {

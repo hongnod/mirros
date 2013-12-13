@@ -179,14 +179,13 @@ void set_task_state(struct task_struct *task, state_t state)
 	state_t new = state;
 	state_change_t change = STATE_NONE_TO_NONE;
 
-	kernel_debug("task %s state old %d new %d\n", task->name, old, new);
+	//kernel_debug("task %s state old %d new %d\n", task->name, old, new);
 	change = get_state_change(old, new);
 	if (change == STATE_NONE_TO_NONE) {
 		return;
 	}
 
 	enter_critical(&flags);
-
 	task->state = new;
 	switch (change) {
 		case STATE_NONE_TO_PREPARE:
@@ -231,9 +230,7 @@ void set_task_state(struct task_struct *task, state_t state)
 			break;
 		default:
 			break;
-
 	}
-
 	exit_critical(&flags);
 }
 
@@ -344,11 +341,11 @@ pid_t get_task_pid(struct task_struct *task)
 	return task->pid;
 }
 
-pid_t sys_get_pid(void)
+pid_t sys_getpid(void)
 {
 	return get_task_pid(current);
 }
-DEFINE_SYSCALL(get_pid, SYSCALL_GET_PID_NR, (void *)sys_get_pid);
+DEFINE_SYSCALL(get_pid, __NR_getpid, (void *)sys_getpid);
 
 struct task_struct *pid_get_task(pid_t pid)
 {

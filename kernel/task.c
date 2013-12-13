@@ -164,7 +164,7 @@ static int alloc_page_table(struct task_struct *new)
 			goto error;
 		}
 		page = va_to_page((unsigned long)addr);
-		page->free_base += (SIZE_4K - sizeof(u32));
+		page->free_base += (PAGE_SIZE - sizeof(u32));
 		list_add_tail(&tmp->stack_list, &page->pgt_list);
 	}
 	tmp->stack_curr = list_next(&tmp->stack_list);
@@ -624,14 +624,14 @@ int load_elf_section(struct elf_section *section,
 	 * so we can calculate the location of the section
 	 * in the memeory
 	 */
-	if ((section->load_addr < 0x00001000) ||
+	if ((section->load_addr < 0x00401000) ||
 	    (section->size == 0))
 		return -EINVAL;
 
 	/* find the memeory location in the list */
 	base = section->load_addr - PROCESS_USER_BASE;
-	i = base / SIZE_4K;
-	j = base % SIZE_4K;
+	i = base >> PAGE_SHIFT;
+	j = base % PAGE_SIZE;
 	kernel_debug("load elf image page %d offset %d\n", i, j);
 	for (k = 0; k <= i; k++) {
 		list = list_next(list);
@@ -644,28 +644,28 @@ int load_elf_section(struct elf_section *section,
 	 * to 0, else we load the data to the image.
 	 */
 	k = section->size;
-	i = 0;
 	mm->elf_size += k;
+	fs_seek(file, section->offset);
 	do {
 		page = list_entry(list, struct page, plist);
 		base_addr = (char *)page->free_base;
 		base_addr = base_addr + j;
+		j = k >= PAGE_SIZE ? PAGE_SIZE -j : k;
 		if (strncmp(section->name, ".bss", 4)) {
-			kernel_debug("load image: %s 0x%x %d\n",
-				     section->name, base_addr, i);
-			fs_seek(file, section->offset);
-			i = fs_read(file, base_addr, SIZE_4K - j);
+			kernel_debug("Load Section:[%s] address:[0x%x] size[0x%x]\n",
+				     section->name, base_addr, j);
+			i = fs_read(file, base_addr, j);
 			if (i < 0)
 				return -EIO;
 		} else {
-			memset(base_addr, 0, k >= SIZE_4K ? SIZE_4K -j : k);
-			break;
+			kernel_debug("Clear BSS section to Zero: base:[0x%x] size:[0x%x]\n",
+				      base_addr, j);
+			memset(base_addr, 0, j);
 		}
 
-		k = k - (SIZE_4K - j);
+		k = k - j;
 		j = 0;
 		list = list_next(list);
-
 	} while (k > 0);
 	
 	return 0;
@@ -841,10 +841,10 @@ int build_idle_task(void)
 	if (idle == NULL)
 		return -ENOMEM;
 
-	idle->pid = -1;
+	idle->pid = 0;
 	idle->uid = 0;
 
-	strncpy(idle->name, "idle", PROCESS_NAME_SIZE - 1);
+	strncpy(idle->name, "idle", PROCESS_NAME_SIZE);
 	idle->flag = 0 | PROCESS_TYPE_KERNEL;
 
 	idle->parent = NULL;
@@ -852,12 +852,8 @@ int build_idle_task(void)
 	init_list(&idle->p);
 
 	init_sched_struct(idle);
-	idle->state = PROCESS_STATE_RUNNING;
-
-	/*
-	 * add task,because kernel already have memory,we
-	 * do not allocate memory for him
-	 */
+	set_task_state(idle, PROCESS_STATE_RUNNING);
+	/* update current and next_run to idle task */
 	current = idle;
 	next_run = idle;
 

@@ -26,7 +26,7 @@ int sys_execve(char __user *filename,
 
 	return ret;
 }
-DEFINE_SYSCALL(execve, SYSCALL_EXECVE_NR, (void *)sys_execve);
+DEFINE_SYSCALL(execve, __NR_execve, (void *)sys_execve);
 
 pid_t sys_fork(void)
 {
@@ -37,7 +37,7 @@ pid_t sys_fork(void)
 
 	return do_fork(NULL, regs, regs->sp, flag);
 }
-DEFINE_SYSCALL(fork, SYSCALL_FORK_NR, (void *)sys_fork);
+DEFINE_SYSCALL(fork, __NR_fork, (void *)sys_fork);
 
 void sys_exit(int ret)
 {
@@ -46,6 +46,15 @@ void sys_exit(int ret)
 	kernel_debug("task %s exit with code %d\n", task->name, ret);
 	sys_signal(get_task_pid(current), PROCESS_SIGNAL_KILL, NULL);
 }
-DEFINE_SYSCALL(exit, SYSCALL_EXIT_NR, (void *)sys_exit);
+DEFINE_SYSCALL(exit, __NR_exit, (void *)sys_exit);
 
+int sys_write(int fd, const void *buf, size_t count)
+{
+	int i;
+	char *str = (char *)buf;
 
+	for (i = 0; i < count; i++)
+		printk("%c ", str[i]);
+	return count;
+}
+DEFINE_SYSCALL(write, __NR_write, (void *)sys_write);

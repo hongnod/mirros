@@ -114,7 +114,7 @@ int sys_signal(pid_t pid, signal_t sig, void *arg)
 
 	return __sys_signal(&signal);
 }
-DEFINE_SYSCALL(signal, SYSCALL_SIGNAL_NR, (void *)sys_signal);
+DEFINE_SYSCALL(signal, __NR_signal, (void *)sys_signal);
 
 int register_signal_handler(signal_t sig, int (*handler)(struct signal *signal))
 {

@@ -18,9 +18,7 @@ unsigned long mount_ramdisk(void)
 		goto exit;
 	}
 
-	/*
-	 * get ramdisk header to check wether it is a correct ramdisk image
-	 */
+	/* get ramdisk header to check wether it is a correct ramdisk image */
 	ramdisk_header = (struct ramdisk_header *)__ramdisk_start;
 	if (strcmp(ramdisk_header->name, "ramdisk")) {
 		ramdisk_header = NULL;
@@ -36,11 +34,8 @@ unsigned long mount_ramdisk(void)
 			ramdisk_header->total_size,
 			ramdisk_header->file_count);
 	
-	/*
-	 * get the address of file table.
-	 */
+	/* get the address of file table. */
 	file_header = (struct file_header *)(__ramdisk_start + sizeof(struct ramdisk_header));
-
 exit:
 	return __ramdisk_start;
 }
@@ -72,9 +67,7 @@ int ramdisk_read(struct file *file, char *buf, int size)
 		memcpy(buf, start, copy_size);
 	}
 
-	/*
-	 * adjust file->curr to right location
-	 */
+	/* adjust file->curr to right location */
 	file->curr += old_size;
 	return old_size;
 }
@@ -98,9 +91,7 @@ struct file *ramdisk_open(char *name)
 	struct file *file = NULL;
 	struct file_header *temp = file_header;
 
-	/*
-	 * search file though compare his name
-	 */
+	/* search file though compare his name */
 	for (i = 0; i < ramdisk_header->file_count; i++) {
 		if(strcmp(name, temp->name) == 0) {
 			file = kmalloc(sizeof(struct file), GFP_KERNEL);
@@ -108,10 +99,7 @@ struct file *ramdisk_open(char *name)
 				return NULL;
 			}
 
-			/*
-			 * the base address of the file is offset
-			 * for __ramdisk_base
-			 */
+			/* the base address of the file is offset for ramdisk_base */
 			file->base = __ramdisk_start + temp->base;
 			file->size = temp->size;
 			file->curr = file->base;
