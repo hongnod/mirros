@@ -405,6 +405,7 @@ int arch_set_up_task_stack(struct task_struct *task, pt_regs *regs)
 	 * when switch task, the context will follow
 	 * below stucture.
 	 */
+	kernel_debug("regs->pc 0x%x regs->sp 0x%x\n", regs->pc, regs->sp);
 	*(--stack_base) = regs->pc;
 	*(--stack_base) = regs->cpsr;
 	*(--stack_base) = regs->sp;

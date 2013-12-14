@@ -101,10 +101,10 @@ char *strncpy(char *des, char *src, int len)
 	char *tmp = des;
 	int i;
 
-	if(des == NULL || src == NULL)
+	if (des == NULL || src == NULL)
 		return NULL;
 
-	for(i = 0; i < len; i++){
+	for (i = 0; i < len; i++) {
 		des[i] = src[i];
 	}
 

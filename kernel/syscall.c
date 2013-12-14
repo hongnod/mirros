@@ -15,14 +15,6 @@ unsigned long *syscall_table_base = NULL;
 extern unsigned long syscall_table_start;
 extern unsigned long syscall_table_end;
 
-int sys_debug(char *buf)
-{
-	printk(buf);
-
-	return 0;
-}
-DEFINE_SYSCALL(debug, __NR_debug, sys_debug);
-
 int install_syscall(int nr, unsigned long *addr)
 {
 	unsigned long *tmp;
@@ -36,9 +28,8 @@ int install_syscall(int nr, unsigned long *addr)
 
 	tmp = syscall_table_base + real_nr;
 	if (!(*tmp)) {
-		kernel_info("install %d syscall addr is0x%x\n", nr, (u32)addr);
+		kernel_debug("install %d syscall addr is0x%x\n", nr, (u32)addr);
 		*tmp = (unsigned long)addr;
-		kernel_info("addr base is 0x%x\n", (u32)*tmp);
 		error = 0;
 	}
 

@@ -107,6 +107,7 @@ struct task_struct {
 	 */
 	struct list_head wait;
 	struct list_head mutex_get;
+	struct mutex mutex;
 
 	void *message;
 };

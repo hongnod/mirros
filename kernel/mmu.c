@@ -42,8 +42,8 @@ void clear_tlb_entry(unsigned long va, size_t size)
 	if(va == 0)
 		va = 1;
 	/*
-	 *for this type of loop, we can optimize it
-	 *do it later we system is ok.
+	 * for this type of loop, we can optimize it
+	 * do it later we system is ok.
 	 */
 	for (i = ((va-1) >> 20); i < size; i++){
 		*tlb_base = 0;
@@ -117,7 +117,7 @@ int build_page_table_entry(unsigned long base,
 	u32 attr;
 	unsigned long pa = va_to_pa(vstart);
 
-	if (!is_aligin(size, SIZE_4K) || size > SIZE_1M) {
+	if (!is_aligin(size, PAGE_SIZE) || size > SIZE_1M) {
 		kernel_error("build page_table_entry: size not aligin");
 		return -EINVAL;
 	}
@@ -128,7 +128,7 @@ int build_page_table_entry(unsigned long base,
 		*addr_base = value;
 
 		addr_base++;
-		pa += SIZE_4K;
+		pa += PAGE_SIZE;
 	}
 
 	return 0;

@@ -62,7 +62,7 @@ static int init_task_struct(struct task_struct *task, u32 flag)
 	task->uid = parent->uid;
 	task->stack_base = NULL;
 	task->stack_base = NULL;
-	strncpy(task->name, parent->name, 15);
+	strncpy(task->name, parent->name, PROCESS_NAME_SIZE);
 	task->flag = flag;
 	task->state = 0;
 
@@ -70,6 +70,7 @@ static int init_task_struct(struct task_struct *task, u32 flag)
 	task->parent = parent;
 	init_list(&task->p);
 	init_list(&task->child);
+	init_mutex(&task->mutex);
 
 	enter_critical(&flags);
 	list_add(&parent->child, &task->p);
@@ -433,7 +434,7 @@ int switch_task(struct task_struct *cur,
 	 * load the page table for stack, because stack
 	 * is grow downward, sub 4m for one page.
 	 */
-	kernel_debug("switch task next is %s\n", next->name);
+	//kernel_debug("switch task next is %s\n", next->name);
 	head = &next->mm_struct.stack_list;
 	list_for_each (head, list) {
 		page = list_entry(list, struct page, pgt_list);
@@ -455,14 +456,13 @@ int switch_task(struct task_struct *cur,
 	return 0;
 }
 
-static int set_up_task_argv(struct task_struct *task,
+static int setup_task_argv(struct task_struct *task,
 			    char **argv)
 {
 	char *argv_base = (char *)(PROCESS_USER_BASE + MAX_ARGV * sizeof(void *));
 	int i, length;
 	struct list_head *list = &task->mm_struct.elf_image_list;
 	unsigned long load_base;
-	struct page *page;
 	u32 *table_base;
 
 	if (!argv)
@@ -475,8 +475,7 @@ static int set_up_task_argv(struct task_struct *task,
 	 * address and load base is kernel space address.
 	 */
 	list = list_next(list);
-	page = list_entry(list, struct page, plist);
-	load_base = page_to_va(page);
+	load_base =page_to_va(list_entry(list, struct page, plist));
 	table_base = (u32 *)load_base;
 	load_base = load_base + ((unsigned long)argv_base - PROCESS_USER_BASE);
 	for (i = 0; i < MAX_ARGV; i++) {
@@ -492,8 +491,6 @@ static int set_up_task_argv(struct task_struct *task,
 		load_base = baligin(load_base, 4);
 	}
 
-	kernel_debug("exit set up argv\n");
-
 	return 0;
 }
 
@@ -508,6 +505,7 @@ struct task_struct *fork_new_task(char *name, u32 user_sp, u32 flag)
 	struct task_struct *new;
 	int ret = 0;
 
+	kernel_debug("Ready to fork a new task %s\n", name);
 	new = kmalloc(sizeof(struct task_struct), GFP_KERNEL);
 	if (new == NULL) {
 		kernel_error("can not allcate memory for new task\n");
@@ -526,10 +524,12 @@ struct task_struct *fork_new_task(char *name, u32 user_sp, u32 flag)
 	 */
 	init_mm_struct(new, user_sp);
 	init_sched_struct(new);
-
 	if (name)
-		strncpy(new->name, name, 15);
-	
+		strncpy(new->name, name, PROCESS_NAME_SIZE);
+
+	kernel_debug("Task: name:%s, prio:%d, pid:%d\n",
+		     new->name, new->prio, new->pid);
+
 	/* allocate page table and memory for task */
 	ret = alloc_memory_for_task(new);
 	if (ret) {
@@ -592,13 +592,7 @@ int kthread_run(char *name, int (*fn)(void *arg), void *arg)
 	flag |= PROCESS_TYPE_KERNEL;	
 	init_pt_regs(&regs, (void *)fn, arg);
 
-	kernel_debug("ready to fork a new task %s\n", name);
-	if (do_fork(name, &regs, 0, flag)) {
-		kernel_error("create kernel thread failed\n");
-		return -ENOMEM;
-	}
-
-	return 0;
+	return do_fork(name, &regs, 0, flag);
 }
 
 void release_task(struct task_struct *task)
@@ -681,6 +675,9 @@ int load_elf_image(struct task_struct *task,
 
 	if (!task || !file || !elf)
 		return -ENOENT;
+
+	/* clear elf size to zero */
+	mm->elf_size = 0;
 
 	/* load each section to memory */
 	for ( ; section != NULL; section = section->next) {
@@ -767,12 +764,15 @@ int do_exec(char __user *name,
 			kernel_debug("can not fork new process when exec\n");
 			return -ENOMEM;
 		}
-	} else
+	} 
+	else {
 		new = current;
+		strncpy(new->name, name, PROCESS_NAME_SIZE);
+	}
 
 	file = fs_open(name);
 	if (!file) {
-		kernel_error("no such file %s\n", name);
+		kernel_error("No such file %s\n", name);
 		err = -ENOENT;
 		goto err_open_file;
 	}
@@ -788,17 +788,18 @@ int do_exec(char __user *name,
 	 * will be coverd by new process. so if process load
 	 * failed, the process will be core dumped.
 	 */
-	strncpy(new->name, name, 15);
 	err = load_elf_image(new, file, elf);
 	if (err) {
 		kernel_error("Failed to load elf file to memory\n");
 		goto release_elf_file;
 	}
+
+	/* flush cache and write buffer to memory */
 	flush_cache();
 
 	/* modify the regs for new process. */
 	init_pt_regs(regs, NULL, (void *)argv);
-	set_up_task_argv(new, argv);
+	setup_task_argv(new, argv);
 
 	/*
 	 * fix me - wether need to do this if exec
@@ -841,7 +842,7 @@ int build_idle_task(void)
 	if (idle == NULL)
 		return -ENOMEM;
 
-	idle->pid = 0;
+	idle->pid = -1;
 	idle->uid = 0;
 
 	strncpy(idle->name, "idle", PROCESS_NAME_SIZE);
@@ -850,9 +851,10 @@ int build_idle_task(void)
 	idle->parent = NULL;
 	init_list(&idle->child);
 	init_list(&idle->p);
+	init_mutex(&idle->mutex);
 
 	init_sched_struct(idle);
-	set_task_state(idle, PROCESS_STATE_RUNNING);
+	idle->state = PROCESS_STATE_RUNNING;
 	/* update current and next_run to idle task */
 	current = idle;
 	next_run = idle;

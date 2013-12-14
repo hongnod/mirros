@@ -21,6 +21,9 @@ static void *signal_table[MAX_SIGNAL] = { 0 };
 int task_kill_self(struct task_struct *task)
 {
 	struct task_struct *system_killer = pid_get_task(0);
+
+	if (!system_killer)
+		return -EINVAL;
 	
 	/*
 	 * when a task try to kill himself, need to
@@ -47,8 +50,6 @@ int signal_kill(struct signal *signal)
 
 	from = pid_get_task(signal->from);
 	to = pid_get_task(signal->to);
-	kernel_debug("Kill task from is 0x%x, to is 0x%x\n", from, to);
-	kernel_debug("Kill task from name is %s state is %d\n", from->name, from->state);
 
 	/*
 	 * if from == to, it means task has stoped and 

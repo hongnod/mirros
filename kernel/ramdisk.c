@@ -27,7 +27,7 @@ unsigned long mount_ramdisk(void)
 	}
 
 	if (ramdisk_header->file_count == 0) {
-		kernel_info("No file in ramdisk\n");
+		kernel_debug("No file in ramdisk\n");
 	}
 
 	kernel_info("find ramdisk : size 0x%x file_count %d\n",
@@ -44,32 +44,21 @@ int ramdisk_read(struct file *file, char *buf, int size)
 {
 	int copy_size = size;
 	unsigned char *start = (unsigned char *)file->curr;
-	int old_size = 0;
 
 	if (!file)
 		return 0;
 
-	if ((unsigned long)(start + size) > (file->base + file->size)) {
+	if ((start + size) > (file->base + file->size)) {
 		copy_size = (unsigned char *)(file->base + file->size) - start;
 	}
 
 	if (copy_size < 0)
 		copy_size = 0;
-	old_size = copy_size;
 
-	for (; copy_size >= 16 ; copy_size -= 16) {
-		memcpy(buf, start, 16);
-		start += 16;
-		buf += 16; 
-	}
-
-	if (copy_size > 0) {
-		memcpy(buf, start, copy_size);
-	}
-
+	memcpy(buf, start, copy_size);
 	/* adjust file->curr to right location */
-	file->curr += old_size;
-	return old_size;
+	file->curr += copy_size;
+	return copy_size;
 }
 
 int ramdisk_seek(struct file *file, u32 offset)

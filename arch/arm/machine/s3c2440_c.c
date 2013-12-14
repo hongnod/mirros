@@ -299,13 +299,22 @@ int console_late_init(void)
 
 int uart_puts(char *buf)
 {
-	char ch;
+	int size;
 
-	while(*buf){
-		ch = *buf;
-		platform_uart0_send_byte(ch);
-		buf++;
-	}
+	size = strlen(buf);
+
+	while (*buf)
+		platform_uart0_send_byte(*buf++);
 	
-	return strlen(buf);
+	return size;
+}
+
+int uart_put_char(char *buf, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		platform_uart0_send_byte(buf[i]);
+
+	return size;
 }

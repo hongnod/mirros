@@ -12,7 +12,7 @@ int op_bits(u32 *bit_map, int n, bit_ops_t ops)
 {
 	int x, y, result = 0;
 	
-	if(!bit_map)
+	if (!bit_map)
 		return -EINVAL;
 
 	get_bit_pos(n, &x, &y);

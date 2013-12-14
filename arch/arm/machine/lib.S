@@ -14,7 +14,7 @@ memcpy:
 	cmp r3, r4
 	bne copy_left
 	sub r2, r2, r3
-
+	
 copy_aligin:
 	cmp r3, #0
 	beq copy_bigger_16

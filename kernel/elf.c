@@ -31,7 +31,7 @@ static void elf_file_add_section(struct elf_file *file,
 		tmp->next = section;
 	}
 
-	kernel_info("[%s]: offset:0x%x size:0x%x load_addr:0x%x\n",
+	kernel_debug("[%s]: offset:0x%x size:0x%x load_addr:0x%x\n",
 		section->name, section->offset,
 		section->size, section->load_addr);
 }
@@ -50,9 +50,7 @@ static struct elf_file *parse_elf_info(elf_section_header *header,
 		return NULL;
 
 	for (i = 0; i< section_num; i++) {
-		/*
-		 *whether this section needed allocate mem.
-		 */
+		/* whether this section needed allocate mem. */
 		if (tmp->sh_flags & SHF_ALLOC) {
 			section = (struct elf_section *)kzalloc(sizeof(struct elf_section), GFP_KERNEL);
 			if (section == NULL) {
@@ -101,10 +99,8 @@ struct elf_file *get_elf_info(struct file *file)
 		return NULL;
 	}
 	
-       /*
-	*confirm whether this file is a elf binary
-	*/
-	if(strncmp(ELFMAG, hdr.e_ident, 4)) {
+       /* confirm whether this file is a elf binary */
+	if (strncmp(ELFMAG, hdr.e_ident, 4)) {
 		printk("file is not a elf file exist\n");
 		return NULL;
 	}

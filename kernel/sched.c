@@ -124,6 +124,8 @@ int sched_remove_task(struct task_struct *task)
 	sched_list_del_task(system, task);
 	exit_critical(&flags);
 
+	release_pid(task);
+
 	return 0;
 }
 
@@ -139,11 +141,12 @@ typedef enum _state_change_t {
 	STATE_SLEEP_TO_PREPARE,
 	STATE_SLEEP_TO_IDLE,
 	STATE_SLEEP_TO_RUNNING,
+	STATE_PREPARE_TO_UNKNOWN,
 	STATE_NONE_TO_NONE,
 } state_change_t;
 
 /* old, new, value */
-#define CHANGE_TABLE_SIZE	(13 * 3)
+#define CHANGE_TABLE_SIZE	(14 * 3)
 static char change_table[CHANGE_TABLE_SIZE] = {
 	PROCESS_STATE_UNKNOWN, PROCESS_STATE_PREPARE, STATE_NONE_TO_PREPARE,
 	PROCESS_STATE_UNKNOWN, PROCESS_STATE_SLEEP, STATE_NONE_TO_SLEEP,
@@ -156,6 +159,7 @@ static char change_table[CHANGE_TABLE_SIZE] = {
 	PROCESS_STATE_SLEEP, PROCESS_STATE_PREPARE, STATE_SLEEP_TO_PREPARE,
 	PROCESS_STATE_SLEEP, PROCESS_STATE_IDLE, STATE_SLEEP_TO_IDLE,
 	PROCESS_STATE_SLEEP, PROCESS_STATE_RUNNING, STATE_SLEEP_TO_RUNNING,
+	PROCESS_STATE_PREPARE, PROCESS_STATE_UNKNOWN, STATE_PREPARE_TO_UNKNOWN
 };
 
 static state_change_t get_state_change(state_t old, state_t new)
@@ -214,7 +218,6 @@ void set_task_state(struct task_struct *task, state_t state)
 			prio_list_add_task_tail(task);
 			break;
 		case STATE_RUNNING_TO_IDLE:
-			kernel_debug("task state run to idle\n");
 			sched_list_add_task_tail(idle, task);
 			break;
 		case STATE_SLEEP_TO_PREPARE:
@@ -227,6 +230,9 @@ void set_task_state(struct task_struct *task, state_t state)
 			break;
 		case STATE_SLEEP_TO_RUNNING:
 			sched_list_del_task(sleep, task);
+			break;
+		case STATE_PREPARE_TO_UNKNOWN:
+			prio_list_del_task(task);
 			break;
 		default:
 			break;
@@ -267,8 +273,7 @@ static void get_task_run_time(struct task_struct *task)
 
 int init_sched_struct(struct task_struct *task)
 {
-
-	if ((task->flag & PROCESS_TYPE_KERNEL) && (task->pid >= 0)) {
+	if ((task->flag & PROCESS_TYPE_KERNEL) && (task->pid > 0)) {
 		/* kernel thread except idle */
 		task->prio = KERNEL_THREAD_PRIO;
 		task->pre_prio = KERNEL_THREAD_PRIO;
@@ -284,8 +289,11 @@ int init_sched_struct(struct task_struct *task)
 		task->pre_prio = task->prio;
 	}
 	else {
-		/* idle process */
-		task->prio = MAX_PRIO - 1;
+		/* idle process, we set idle task as a high prio at
+		 * boot stage, when idle is over and init task is ready
+		 * to run we will set its prio to MAX_PRIO -1
+		 */
+		task->prio = KERNEL_THREAD_PRIO -1;
 		task->pre_prio = task->prio;
 	}
 
@@ -304,6 +312,18 @@ int init_sched_struct(struct task_struct *task)
 
 	init_list(&task->mutex_get);
 	init_list(&task->wait);
+
+	return 0;
+}
+
+int release_pid(struct task_struct *task)
+{
+	struct pid_map *map = &pid_map;
+	u32 *base = (u32 *)map->addr;
+
+	mutex_lock(&map->pid_map_mutex);
+	base[task->pid] = 0;
+	mutex_unlock(&map->pid_map_mutex);
 
 	return 0;
 }
@@ -350,13 +370,53 @@ DEFINE_SYSCALL(get_pid, __NR_getpid, (void *)sys_getpid);
 struct task_struct *pid_get_task(pid_t pid)
 {
 	u32 *addr;
+	u32 flags;
 	
 	if (pid < pid_map.nr) {
+		enter_critical(&flags);
 		addr = pid_map.addr;
+		exit_critical(&flags);
 		return (struct task_struct *)(*(addr + pid));
 	}
 
 	return NULL;
+}
+
+int set_task_prio(struct task_struct *task, int prio)
+{
+	state_t state = get_task_state(task);
+
+	if (prio >= MAX_PRIO)
+		return -EINVAL;
+
+	switch (state) {
+		/*
+		 * if the task is in running or sleep state, we
+		 * can directory set it prio to the right one.
+		 */
+		case PROCESS_STATE_RUNNING:
+		case PROCESS_STATE_SLEEP:
+			task->pre_prio = task->prio;
+			task->prio = prio;
+			break;
+
+		/*
+		 * if the task is in prepare state, we first set its
+		 * task to UNKNOWN state, then change its prio to new one.
+		 */
+		case PROCESS_STATE_PREPARE:
+			set_task_state(task, PROCESS_STATE_UNKNOWN);
+			task->pre_prio = task->prio;
+			task->prio = prio;
+			set_task_state(task, PROCESS_STATE_PREPARE);
+			break;
+
+		default:
+			kernel_error("Unknown state when set prio");
+			break;
+	}
+
+	return 0;
 }
 
 static struct task_struct *find_next_run_task(void)
@@ -528,8 +588,6 @@ int suspend_task_timeout(struct task_struct *task, int timeout)
 
 int wakeup_task(struct task_struct *task)
 {
-	unsigned long flags;
-
 	if (get_task_state(task) != PROCESS_STATE_SLEEP)
 		return -EINVAL;
 
@@ -550,6 +608,7 @@ int system_killer(void *arg)
 		kernel_debug("Enter in system killer process\n");
 		sched_list_for_each(idle, list) {
 			task = list_entry(list, struct task_struct, idle);
+			kernel_debug("kill task %s\n", task->name);
 			kill_task(task);
 		}
 

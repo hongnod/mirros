@@ -24,8 +24,8 @@ extern int arch_init_exception_stack(void);
 extern int init_task();
 extern unsigned long mount_ramdisk(void);
 extern int syscall_init(void);
-extern int system_killer(void *arg);
 extern int init_signal_handler(void);
+extern int system_killer(void *arg);
 
 int main(void)
 {
@@ -55,11 +55,11 @@ int main(void)
 	mount_ramdisk();
 
 	build_idle_task();
-	kthread_run("system_killer", system_killer, NULL);
-	init_task();
 	/* now we can enable irq */
 	enable_irqs();
-
+	kthread_run("system_killer", system_killer, NULL);
+	init_task();
+	set_task_prio(idle, MAX_PRIO - 1);
 	for (;;) {
 		kernel_debug("In Idle State\n");
 		sched();

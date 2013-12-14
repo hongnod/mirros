@@ -43,18 +43,13 @@ void sys_exit(int ret)
 {
 	struct task_struct *task = current;
 
-	kernel_debug("task %s exit with code %d\n", task->name, ret);
 	sys_signal(get_task_pid(current), PROCESS_SIGNAL_KILL, NULL);
 }
 DEFINE_SYSCALL(exit, __NR_exit, (void *)sys_exit);
 
 int sys_write(int fd, const void *buf, size_t count)
 {
-	int i;
-	char *str = (char *)buf;
-
-	for (i = 0; i < count; i++)
-		printk("%c ", str[i]);
-	return count;
+	if (fd == 1)
+		return uart_put_char(buf, count);
 }
 DEFINE_SYSCALL(write, __NR_write, (void *)sys_write);
